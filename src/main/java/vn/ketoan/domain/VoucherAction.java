@@ -6,6 +6,7 @@ public enum VoucherAction {
     SUBMITTED(Permission.SUBMIT_VOUCHER),
     RETURNED(Permission.REVIEW_VOUCHER),
     APPROVED(Permission.REVIEW_VOUCHER),
+    POSTED(Permission.POST_VOUCHER),
     APPROVAL_WITHDRAWN(Permission.WITHDRAW_APPROVAL),
     CANCELLED(Permission.CANCEL_VOUCHER);
 

@@ -5,5 +5,6 @@ public enum VoucherStatus {
     PENDING_APPROVAL,
     RETURNED,
     APPROVED,
+    POSTED,
     CANCELLED
 }

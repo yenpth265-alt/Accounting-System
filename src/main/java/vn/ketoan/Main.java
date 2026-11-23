@@ -1,6 +1,7 @@
 package vn.ketoan;
 
 import vn.ketoan.demo.MasterDataDemo;
+import vn.ketoan.demo.PostingDemo;
 import vn.ketoan.demo.VoucherDemo;
 import vn.ketoan.demo.WorkflowDemo;
 
@@ -15,6 +16,7 @@ public final class Main {
             System.out.println("Run with --demo=master-data to see accounts, partners and periods.");
             System.out.println("Run with --demo=vouchers to see voucher creation and validation patterns.");
             System.out.println("Run with --demo=workflow to see permissions, approvals and audit history.");
+            System.out.println("Run with --demo=posting to see atomic journal posting and ledger balances.");
             return;
         }
         if (args.length == 1 && "--demo=master-data".equals(args[0])) {
@@ -29,7 +31,11 @@ public final class Main {
             WorkflowDemo.run(System.out);
             return;
         }
+        if (args.length == 1 && "--demo=posting".equals(args[0])) {
+            PostingDemo.run(System.out);
+            return;
+        }
         throw new IllegalArgumentException(
-                "Supported options: --help, --demo=master-data, --demo=vouchers, --demo=workflow");
+                "Supported options: --help, --demo=master-data, --demo=vouchers, --demo=workflow, --demo=posting");
     }
 }

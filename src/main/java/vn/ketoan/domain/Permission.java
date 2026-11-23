@@ -6,6 +6,7 @@ public enum Permission {
     EDIT_VOUCHER,
     SUBMIT_VOUCHER,
     REVIEW_VOUCHER,
+    POST_VOUCHER,
     WITHDRAW_APPROVAL,
     CANCEL_VOUCHER
 }

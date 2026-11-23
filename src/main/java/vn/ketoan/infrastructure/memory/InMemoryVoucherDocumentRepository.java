@@ -18,6 +18,18 @@ public final class InMemoryVoucherDocumentRepository implements VoucherDocumentR
     private final Map<UUID, VoucherDocument> documents = new LinkedHashMap<>();
     private final Map<String, UUID> references = new LinkedHashMap<>();
 
+    public InMemoryVoucherDocumentRepository() {
+    }
+
+    InMemoryVoucherDocumentRepository(List<VoucherDocument> committed) {
+        for (VoucherDocument document : committed) {
+            if (documents.putIfAbsent(document.getId(), document) != null
+                    || references.putIfAbsent(document.getContent().getReference(), document.getId()) != null) {
+                throw new IllegalArgumentException("Duplicate document in committed snapshot");
+            }
+        }
+    }
+
     @Override
     public synchronized Optional<VoucherDocument> findById(UUID id) {
         return Optional.ofNullable(documents.get(Objects.requireNonNull(id, "Document id is required")));

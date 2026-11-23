@@ -68,6 +68,10 @@ public final class VoucherDocument {
                 requireIndependentReviewer(actor);
                 requireStatus(VoucherStatus.APPROVED);
             }
+            case POSTED -> {
+                requirePostingActor(actor);
+                requireStatus(VoucherStatus.APPROVED);
+            }
             case CANCELLED -> {
                 if (!actor.hasRole(UserRole.CHIEF)) {
                     requireOwner(actor);
@@ -126,6 +130,15 @@ public final class VoucherDocument {
         return change(actor, VoucherAction.CANCELLED, content, VoucherStatus.CANCELLED, time, reason);
     }
 
+    public void requirePostingActor(User actor) {
+        Objects.requireNonNull(actor, "Actor is required").requirePermission(Permission.POST_VOUCHER);
+        requireIndependentReviewer(actor);
+    }
+
+    public VoucherDocument markPosted(User actor, Instant time) {
+        return change(actor, VoucherAction.POSTED, content, VoucherStatus.POSTED, time, "Posted to ledger");
+    }
+
     private VoucherDocument change(User actor, VoucherAction action, Voucher nextContent,
                                    VoucherStatus nextStatus, Instant time, String note) {
         requireActionAllowed(actor, action);
@@ -174,11 +187,26 @@ public final class VoucherDocument {
     }
 
     public OptionalLong getApprovedBy() {
-        return status == VoucherStatus.APPROVED
-                ? OptionalLong.of(history.getLast().actorId()) : OptionalLong.empty();
+        Optional<VoucherHistoryEntry> approval = currentApproval();
+        return approval.isPresent() ? OptionalLong.of(approval.orElseThrow().actorId()) : OptionalLong.empty();
     }
 
     public Optional<Instant> getApprovedAt() {
-        return status == VoucherStatus.APPROVED ? Optional.of(updatedAt) : Optional.empty();
+        return currentApproval().map(VoucherHistoryEntry::occurredAt);
+    }
+
+    private Optional<VoucherHistoryEntry> currentApproval() {
+        if (status != VoucherStatus.APPROVED && status != VoucherStatus.POSTED) {
+            return Optional.empty();
+        }
+        return history.reversed().stream().filter(entry -> entry.action() == VoucherAction.APPROVED).findFirst();
+    }
+
+    public OptionalLong getPostedBy() {
+        return status == VoucherStatus.POSTED ? OptionalLong.of(history.getLast().actorId()) : OptionalLong.empty();
+    }
+
+    public Optional<Instant> getPostedAt() {
+        return status == VoucherStatus.POSTED ? Optional.of(updatedAt) : Optional.empty();
     }
 }

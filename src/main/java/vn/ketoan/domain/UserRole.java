@@ -6,7 +6,7 @@ public enum UserRole {
     ACCOUNTANT(Set.of(Permission.VIEW_VOUCHERS, Permission.CREATE_VOUCHER,
             Permission.EDIT_VOUCHER, Permission.SUBMIT_VOUCHER, Permission.CANCEL_VOUCHER)),
     CHIEF(Set.of(Permission.VIEW_VOUCHERS, Permission.REVIEW_VOUCHER,
-            Permission.WITHDRAW_APPROVAL, Permission.CANCEL_VOUCHER)),
+            Permission.WITHDRAW_APPROVAL, Permission.POST_VOUCHER, Permission.CANCEL_VOUCHER)),
     VIEWER(Set.of(Permission.VIEW_VOUCHERS)),
     ADMIN(Set.of());
 
