@@ -1,0 +1,11 @@
+package vn.ketoan.domain;
+
+public enum Permission {
+    VIEW_VOUCHERS,
+    CREATE_VOUCHER,
+    EDIT_VOUCHER,
+    SUBMIT_VOUCHER,
+    REVIEW_VOUCHER,
+    WITHDRAW_APPROVAL,
+    CANCEL_VOUCHER
+}
