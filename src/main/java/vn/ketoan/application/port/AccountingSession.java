@@ -16,4 +16,6 @@ public interface AccountingSession {
     VoucherDocumentRepository documents();
 
     JournalRepository journal();
+
+    DebtAllocationRepository allocations();
 }

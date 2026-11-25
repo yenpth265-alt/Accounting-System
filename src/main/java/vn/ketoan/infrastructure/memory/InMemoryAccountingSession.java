@@ -9,6 +9,7 @@ import java.util.function.Supplier;
 import vn.ketoan.application.port.AccountRepository;
 import vn.ketoan.application.port.AccountingPeriodRepository;
 import vn.ketoan.application.port.AccountingSession;
+import vn.ketoan.application.port.DebtAllocationRepository;
 import vn.ketoan.application.port.JournalRepository;
 import vn.ketoan.application.port.MoneyAccountRepository;
 import vn.ketoan.application.port.PartnerRepository;
@@ -16,6 +17,8 @@ import vn.ketoan.application.port.UserRepository;
 import vn.ketoan.application.port.VoucherDocumentRepository;
 import vn.ketoan.domain.Account;
 import vn.ketoan.domain.AccountingPeriod;
+import vn.ketoan.domain.AllocationCancellation;
+import vn.ketoan.domain.DebtAllocation;
 import vn.ketoan.domain.JournalEntry;
 import vn.ketoan.domain.MoneyAccount;
 import vn.ketoan.domain.Partner;
@@ -35,6 +38,7 @@ final class InMemoryAccountingSession implements AccountingSession {
     private final InMemoryUserRepository userData = new InMemoryUserRepository();
     private final InMemoryVoucherDocumentRepository documentData;
     private final InMemoryJournalRepository journalData = new InMemoryJournalRepository();
+    private final InMemoryDebtAllocationRepository allocationData = new InMemoryDebtAllocationRepository();
 
     InMemoryAccountingSession(InMemoryAccountingState committed) {
         committed.accounts().forEach(accountData::insert);
@@ -44,6 +48,8 @@ final class InMemoryAccountingSession implements AccountingSession {
         committed.users().forEach(userData::insert);
         documentData = new InMemoryVoucherDocumentRepository(committed.documents());
         committed.journal().forEach(journalData::append);
+        committed.allocations().forEach(allocationData::append);
+        committed.cancellations().forEach(allocationData::appendCancellation);
     }
 
     private void checkScope() {
@@ -80,7 +86,8 @@ final class InMemoryAccountingSession implements AccountingSession {
             throw new IllegalStateException("Transaction is rollback-only after a repository failure");
         }
         return new InMemoryAccountingState(accountData.findAll(), partnerData.findAll(), fundData.findAll(),
-                periodData.findAll(), userData.findAll(), documentData.findAll(), journalData.findAll());
+                periodData.findAll(), userData.findAll(), documentData.findAll(), journalData.findAll(),
+                allocationData.findAll(), allocationData.findCancellations());
     }
 
     private final AccountRepository accountView = new AccountRepository() {
@@ -217,6 +224,33 @@ final class InMemoryAccountingSession implements AccountingSession {
         }
     };
 
+    private final DebtAllocationRepository allocationView = new DebtAllocationRepository() {
+        @Override
+        public Optional<DebtAllocation> findById(UUID id) {
+            return access(() -> allocationData.findById(id));
+        }
+        @Override
+        public List<DebtAllocation> findAll() {
+            return access(allocationData::findAll);
+        }
+        @Override
+        public Optional<AllocationCancellation> findCancellation(UUID id) {
+            return access(() -> allocationData.findCancellation(id));
+        }
+        @Override
+        public List<AllocationCancellation> findCancellations() {
+            return access(allocationData::findCancellations);
+        }
+        @Override
+        public void append(DebtAllocation allocation) {
+            mutate(() -> allocationData.append(allocation));
+        }
+        @Override
+        public void appendCancellation(AllocationCancellation cancellation) {
+            mutate(() -> allocationData.appendCancellation(cancellation));
+        }
+    };
+
     @Override
     public AccountRepository accounts() {
         checkScope();
@@ -251,5 +285,11 @@ final class InMemoryAccountingSession implements AccountingSession {
     public JournalRepository journal() {
         checkScope();
         return journalView;
+    }
+
+    @Override
+    public DebtAllocationRepository allocations() {
+        checkScope();
+        return allocationView;
     }
 }

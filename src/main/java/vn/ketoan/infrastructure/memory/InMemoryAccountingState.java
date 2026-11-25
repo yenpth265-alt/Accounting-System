@@ -8,9 +8,12 @@ import java.util.stream.Collectors;
 
 import vn.ketoan.domain.Account;
 import vn.ketoan.domain.AccountingPeriod;
+import vn.ketoan.domain.AllocationCancellation;
+import vn.ketoan.domain.DebtAllocation;
 import vn.ketoan.domain.JournalEntry;
 import vn.ketoan.domain.JournalLine;
 import vn.ketoan.domain.MoneyAccount;
+import vn.ketoan.domain.OpenItemBook;
 import vn.ketoan.domain.Partner;
 import vn.ketoan.domain.User;
 import vn.ketoan.domain.VoucherDocument;
@@ -19,7 +22,8 @@ import vn.ketoan.domain.VoucherStatus;
 /** Immutable committed membership; every entity and nested collection is also immutable. */
 record InMemoryAccountingState(List<Account> accounts, List<Partner> partners,
                                List<MoneyAccount> moneyAccounts, List<AccountingPeriod> periods,
-                               List<User> users, List<VoucherDocument> documents, List<JournalEntry> journal) {
+                               List<User> users, List<VoucherDocument> documents, List<JournalEntry> journal,
+                               List<DebtAllocation> allocations, List<AllocationCancellation> cancellations) {
 
     InMemoryAccountingState {
         accounts = List.copyOf(accounts);
@@ -29,11 +33,13 @@ record InMemoryAccountingState(List<Account> accounts, List<Partner> partners,
         users = List.copyOf(users);
         documents = List.copyOf(documents);
         journal = List.copyOf(journal);
+        allocations = List.copyOf(allocations);
+        cancellations = List.copyOf(cancellations);
     }
 
     static InMemoryAccountingState empty() {
         return new InMemoryAccountingState(List.of(), List.of(), List.of(), List.of(),
-                List.of(), List.of(), List.of());
+                List.of(), List.of(), List.of(), List.of(), List.of());
     }
 
     void validateIntegrity() {
@@ -78,5 +84,10 @@ record InMemoryAccountingState(List<Account> accounts, List<Partner> partners,
                 });
             }
         }
+        if (allocations.stream().anyMatch(value -> !userIndex.containsKey(value.recordedBy()))
+                || cancellations.stream().anyMatch(value -> !userIndex.containsKey(value.recordedBy()))) {
+            throw new IllegalStateException("Allocation history references an unknown user");
+        }
+        new OpenItemBook(accounts, journal, allocations, cancellations);
     }
 }

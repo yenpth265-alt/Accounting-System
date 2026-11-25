@@ -21,7 +21,9 @@ class UserAuthorizationTest {
             "ACCOUNTANT,REVIEW_VOUCHER,false", "CHIEF,REVIEW_VOUCHER,true",
             "CHIEF,CREATE_VOUCHER,false", "VIEWER,VIEW_VOUCHERS,true",
             "VIEWER,SUBMIT_VOUCHER,false", "ADMIN,VIEW_VOUCHERS,false",
-            "ADMIN,REVIEW_VOUCHER,false", "CHIEF,WITHDRAW_APPROVAL,true"})
+            "ADMIN,REVIEW_VOUCHER,false", "CHIEF,WITHDRAW_APPROVAL,true",
+            "CHIEF,ALLOCATE_DEBT,true", "CHIEF,CANCEL_DEBT_ALLOCATION,true",
+            "ACCOUNTANT,ALLOCATE_DEBT,false", "ACCOUNTANT,CANCEL_DEBT_ALLOCATION,false"})
     void rolesGrantOnlyTheirDeclaredAccountingPermissions(UserRole role, Permission permission, boolean allowed) {
         User user = new User(1, "User1", "Name", Set.of(role));
         if (allowed) {

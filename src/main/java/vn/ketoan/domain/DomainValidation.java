@@ -1,5 +1,6 @@
 package vn.ketoan.domain;
 
+import java.time.LocalDate;
 import java.util.Locale;
 import java.util.Objects;
 
@@ -25,5 +26,13 @@ final class DomainValidation {
                     label + " must start with a letter or digit and use only letters, digits, '.', '_' or '-'");
         }
         return normalized.toUpperCase(Locale.ROOT);
+    }
+
+    static LocalDate date(LocalDate value, String label) {
+        Objects.requireNonNull(value, label + " is required");
+        if (value.getYear() < 1000 || value.getYear() > 9999) {
+            throw new IllegalArgumentException(label + " must be within years 1000 to 9999");
+        }
+        return value;
     }
 }
