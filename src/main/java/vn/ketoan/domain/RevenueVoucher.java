@@ -24,10 +24,15 @@ public final class RevenueVoucher extends Voucher {
                 String customer = line.getPartnerCode().orElseThrow();
                 context.requirePartner(customer).requireRole(PartnerRole.CUSTOMER);
                 customers.add(customer);
-            } else if (account.getType() == AccountType.REVENUE) {
-                hasRevenue = true;
-            } else if (account.getType() != AccountType.LIABILITY || account.getTracking() != AccountTracking.NONE) {
-                throw new IllegalArgumentException("Revenue credits must be revenue or untracked liabilities");
+            } else {
+                if (account.getTracking() != AccountTracking.NONE || line.getPartnerCode().isPresent()) {
+                    throw new IllegalArgumentException("Revenue credit components cannot track counterparties");
+                }
+                if (account.getType() == AccountType.REVENUE) {
+                    hasRevenue = true;
+                } else if (account.getType() != AccountType.LIABILITY) {
+                    throw new IllegalArgumentException("Revenue credits must be revenue or untracked liabilities");
+                }
             }
         }
         if (!hasRevenue || customers.size() != 1) {

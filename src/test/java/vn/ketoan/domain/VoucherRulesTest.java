@@ -1,10 +1,17 @@
 package vn.ketoan.domain;
 
+import java.time.YearMonth;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static vn.ketoan.VoucherTestData.context;
+import static vn.ketoan.VoucherTestData.account;
+import static vn.ketoan.VoucherTestData.accounts;
+import static vn.ketoan.VoucherTestData.DATE;
 import static vn.ketoan.VoucherTestData.credit;
 import static vn.ketoan.VoucherTestData.debit;
 import static vn.ketoan.VoucherTestData.draft;
@@ -12,8 +19,46 @@ import static vn.ketoan.VoucherTestData.expense;
 import static vn.ketoan.VoucherTestData.general;
 import static vn.ketoan.VoucherTestData.payment;
 import static vn.ketoan.VoucherTestData.receipt;
+import static vn.ketoan.VoucherTestData.moneyAccounts;
+import static vn.ketoan.VoucherTestData.partners;
 
 class VoucherRulesTest {
+
+    @Test
+    void recognitionComponentsCannotCarryUnrelatedPartnerTags() {
+        assertAll(
+                () -> assertThrows(IllegalArgumentException.class,
+                        () -> new RevenueVoucher(draft(debit("131", 10, "KH01", null),
+                                credit("5113", 10, "KH02", null))).validateForSubmission(context())),
+                () -> assertThrows(IllegalArgumentException.class,
+                        () -> new RevenueVoucher(draft(debit("131", 11, "KH01", null),
+                                credit("5113", 10, null, null), credit("33311", 1, "KH02", null)))
+                                .validateForSubmission(context())),
+                () -> assertThrows(IllegalArgumentException.class,
+                        () -> new ExpenseVoucher(draft(debit("6427", 10, "NCC01", null),
+                                credit("331", 10, "NCC01", null))).validateForSubmission(context())),
+                () -> assertThrows(IllegalArgumentException.class,
+                        () -> new ExpenseVoucher(draft(debit("6427", 10, null, null),
+                                debit("1331", 1, "KH01", null), credit("331", 11, "NCC01", null)))
+                                .validateForSubmission(context())));
+    }
+
+    @Test
+    void recognitionComponentsCannotUsePartnerTrackedProfitAndLossAccounts() {
+        List<Account> accounts = new ArrayList<>(accounts());
+        accounts.add(account("511P", AccountType.REVENUE, AccountTracking.PARTNER));
+        accounts.add(account("642P", AccountType.EXPENSE, AccountTracking.PARTNER));
+        VoucherValidationContext context = new VoucherValidationContext(accounts, partners(), moneyAccounts(),
+                AccountingPeriod.open(YearMonth.from(DATE)));
+
+        assertAll(
+                () -> assertThrows(IllegalArgumentException.class,
+                        () -> new RevenueVoucher(draft(debit("131", 10, "KH01", null),
+                                credit("511P", 10, "KH01", null))).validateForSubmission(context)),
+                () -> assertThrows(IllegalArgumentException.class,
+                        () -> new ExpenseVoucher(draft(debit("642P", 10, "NCC01", null),
+                                credit("331", 10, "NCC01", null))).validateForSubmission(context)));
+    }
 
     @Test
     void revenueSupportsSeparateTaxLiabilityWithoutAssumingATaxRate() {

@@ -24,10 +24,15 @@ public final class ExpenseVoucher extends Voucher {
                 String supplier = line.getPartnerCode().orElseThrow();
                 context.requirePartner(supplier).requireRole(PartnerRole.SUPPLIER);
                 suppliers.add(supplier);
-            } else if (account.getType() == AccountType.EXPENSE) {
-                hasExpense = true;
-            } else if (account.getType() != AccountType.ASSET || account.getTracking() != AccountTracking.NONE) {
-                throw new IllegalArgumentException("Expense debits must be expenses or untracked assets");
+            } else {
+                if (account.getTracking() != AccountTracking.NONE || line.getPartnerCode().isPresent()) {
+                    throw new IllegalArgumentException("Expense debit components cannot track counterparties");
+                }
+                if (account.getType() == AccountType.EXPENSE) {
+                    hasExpense = true;
+                } else if (account.getType() != AccountType.ASSET) {
+                    throw new IllegalArgumentException("Expense debits must be expenses or untracked assets");
+                }
             }
         }
         if (!hasExpense || suppliers.size() != 1) {
