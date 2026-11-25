@@ -18,4 +18,10 @@ public interface AccountingSession {
     JournalRepository journal();
 
     DebtAllocationRepository allocations();
+
+    CorrectionRepository corrections();
+
+    PrepaidPlanRepository prepaidPlans();
+
+    PrepaidAllocationRepository prepaidAllocations();
 }

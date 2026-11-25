@@ -12,18 +12,25 @@ import vn.ketoan.application.port.AccountRepository;
 import vn.ketoan.application.port.AccountingPeriodRepository;
 import vn.ketoan.application.port.AccountingSession;
 import vn.ketoan.application.port.DebtAllocationRepository;
+import vn.ketoan.application.port.CorrectionRepository;
 import vn.ketoan.application.port.JournalRepository;
 import vn.ketoan.application.port.MoneyAccountRepository;
 import vn.ketoan.application.port.PartnerRepository;
+import vn.ketoan.application.port.PrepaidAllocationRepository;
+import vn.ketoan.application.port.PrepaidPlanRepository;
 import vn.ketoan.application.port.UserRepository;
 import vn.ketoan.application.port.VoucherDocumentRepository;
 import vn.ketoan.domain.Account;
 import vn.ketoan.domain.AccountingPeriod;
 import vn.ketoan.domain.AllocationCancellation;
 import vn.ketoan.domain.DebtAllocation;
+import vn.ketoan.domain.CorrectionRecord;
 import vn.ketoan.domain.JournalEntry;
 import vn.ketoan.domain.MoneyAccount;
 import vn.ketoan.domain.Partner;
+import vn.ketoan.domain.PrepaidAllocationRecord;
+import vn.ketoan.domain.PrepaidExpensePlan;
+import vn.ketoan.domain.PrepaidPlanCancellation;
 import vn.ketoan.domain.User;
 import vn.ketoan.domain.VoucherDocument;
 
@@ -41,6 +48,9 @@ final class InMemoryAccountingSession implements AccountingSession {
     private final InMemoryVoucherDocumentRepository documentData;
     private final InMemoryJournalRepository journalData = new InMemoryJournalRepository();
     private final InMemoryDebtAllocationRepository allocationData = new InMemoryDebtAllocationRepository();
+    private final InMemoryCorrectionRepository correctionData = new InMemoryCorrectionRepository();
+    private final InMemoryPrepaidPlanRepository prepaidPlanData = new InMemoryPrepaidPlanRepository();
+    private final InMemoryPrepaidAllocationRepository prepaidAllocationData = new InMemoryPrepaidAllocationRepository();
 
     InMemoryAccountingSession(AccountingSnapshot committed) {
         committed.accounts().forEach(accountData::insert);
@@ -52,6 +62,10 @@ final class InMemoryAccountingSession implements AccountingSession {
         committed.journal().forEach(journalData::append);
         committed.allocations().forEach(allocationData::append);
         committed.cancellations().forEach(allocationData::appendCancellation);
+        committed.corrections().forEach(correctionData::append);
+        committed.prepaidPlans().forEach(prepaidPlanData::append);
+        committed.prepaidCancellations().forEach(prepaidPlanData::appendCancellation);
+        committed.prepaidAllocations().forEach(prepaidAllocationData::append);
     }
 
     private void checkScope() {
@@ -89,7 +103,8 @@ final class InMemoryAccountingSession implements AccountingSession {
         }
         return new AccountingSnapshot(accountData.findAll(), partnerData.findAll(), fundData.findAll(),
                 periodData.findAll(), userData.findAll(), documentData.findAll(), journalData.findAll(),
-                allocationData.findAll(), allocationData.findCancellations());
+                allocationData.findAll(), allocationData.findCancellations(), correctionData.findAll(),
+                prepaidPlanData.findAll(), prepaidPlanData.findCancellations(), prepaidAllocationData.findAll());
     }
 
     private final AccountRepository accountView = new AccountRepository() {
@@ -253,6 +268,29 @@ final class InMemoryAccountingSession implements AccountingSession {
         }
     };
 
+    private final CorrectionRepository correctionView = new CorrectionRepository() {
+        @Override public Optional<CorrectionRecord> findById(UUID id) { return access(() -> correctionData.findById(id)); }
+        @Override public Optional<CorrectionRecord> findByTargetDocumentId(UUID id) { return access(() -> correctionData.findByTargetDocumentId(id)); }
+        @Override public List<CorrectionRecord> findAll() { return access(correctionData::findAll); }
+        @Override public void append(CorrectionRecord record) { mutate(() -> correctionData.append(record)); }
+    };
+
+    private final PrepaidPlanRepository prepaidPlanView = new PrepaidPlanRepository() {
+        @Override public Optional<PrepaidExpensePlan> findById(UUID id) { return access(() -> prepaidPlanData.findById(id)); }
+        @Override public List<PrepaidExpensePlan> findAll() { return access(prepaidPlanData::findAll); }
+        @Override public void append(PrepaidExpensePlan plan) { mutate(() -> prepaidPlanData.append(plan)); }
+        @Override public Optional<PrepaidPlanCancellation> findCancellation(UUID id) { return access(() -> prepaidPlanData.findCancellation(id)); }
+        @Override public List<PrepaidPlanCancellation> findCancellations() { return access(prepaidPlanData::findCancellations); }
+        @Override public void appendCancellation(PrepaidPlanCancellation value) { mutate(() -> prepaidPlanData.appendCancellation(value)); }
+    };
+
+    private final PrepaidAllocationRepository prepaidAllocationView = new PrepaidAllocationRepository() {
+        @Override public Optional<PrepaidAllocationRecord> findById(UUID id) { return access(() -> prepaidAllocationData.findById(id)); }
+        @Override public Optional<PrepaidAllocationRecord> findByTargetDocumentId(UUID id) { return access(() -> prepaidAllocationData.findByTargetDocumentId(id)); }
+        @Override public List<PrepaidAllocationRecord> findAll() { return access(prepaidAllocationData::findAll); }
+        @Override public void append(PrepaidAllocationRecord value) { mutate(() -> prepaidAllocationData.append(value)); }
+    };
+
     @Override
     public AccountRepository accounts() {
         checkScope();
@@ -294,4 +332,8 @@ final class InMemoryAccountingSession implements AccountingSession {
         checkScope();
         return allocationView;
     }
+
+    @Override public CorrectionRepository corrections() { checkScope(); return correctionView; }
+    @Override public PrepaidPlanRepository prepaidPlans() { checkScope(); return prepaidPlanView; }
+    @Override public PrepaidAllocationRepository prepaidAllocations() { checkScope(); return prepaidAllocationView; }
 }

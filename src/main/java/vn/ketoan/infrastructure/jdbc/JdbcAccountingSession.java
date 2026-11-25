@@ -6,9 +6,12 @@ import vn.ketoan.application.port.AccountRepository;
 import vn.ketoan.application.port.AccountingPeriodRepository;
 import vn.ketoan.application.port.AccountingSession;
 import vn.ketoan.application.port.DebtAllocationRepository;
+import vn.ketoan.application.port.CorrectionRepository;
 import vn.ketoan.application.port.JournalRepository;
 import vn.ketoan.application.port.MoneyAccountRepository;
 import vn.ketoan.application.port.PartnerRepository;
+import vn.ketoan.application.port.PrepaidAllocationRepository;
+import vn.ketoan.application.port.PrepaidPlanRepository;
 import vn.ketoan.application.port.UserRepository;
 import vn.ketoan.application.port.VoucherDocumentRepository;
 
@@ -23,6 +26,9 @@ final class JdbcAccountingSession implements AccountingSession {
     private final VoucherDocumentRepository documents;
     private final JournalRepository journal;
     private final DebtAllocationRepository allocations;
+    private final CorrectionRepository corrections;
+    private final PrepaidPlanRepository prepaidPlans;
+    private final PrepaidAllocationRepository prepaidAllocations;
 
     JdbcAccountingSession(Connection connection) {
         context = new JdbcContext(connection);
@@ -34,6 +40,9 @@ final class JdbcAccountingSession implements AccountingSession {
         documents = new JdbcVoucherDocumentRepository(context);
         journal = new JdbcJournalRepository(context);
         allocations = new JdbcDebtAllocationRepository(context);
+        corrections = new JdbcCorrectionRepository(context);
+        prepaidPlans = new JdbcPrepaidPlanRepository(context);
+        prepaidAllocations = new JdbcPrepaidAllocationRepository(context);
     }
 
     void abort() { context.abort(); }
@@ -48,4 +57,7 @@ final class JdbcAccountingSession implements AccountingSession {
     @Override public VoucherDocumentRepository documents() { context.checkScope(); return documents; }
     @Override public JournalRepository journal() { context.checkScope(); return journal; }
     @Override public DebtAllocationRepository allocations() { context.checkScope(); return allocations; }
+    @Override public CorrectionRepository corrections() { context.checkScope(); return corrections; }
+    @Override public PrepaidPlanRepository prepaidPlans() { context.checkScope(); return prepaidPlans; }
+    @Override public PrepaidAllocationRepository prepaidAllocations() { context.checkScope(); return prepaidAllocations; }
 }

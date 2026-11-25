@@ -61,7 +61,7 @@ class MySqlSchemaInstallIT {
             }
             SchemaMigrator migrator = new SchemaMigrator(database.connections());
             assertThrows(IllegalStateException.class, migrator::migrate);
-            assertEquals(1, migrator.migrate(true));
+            assertEquals(2, migrator.migrate(true));
             assertEquals(0, migrator.migrate());
         }
     }

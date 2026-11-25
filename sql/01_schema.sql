@@ -1,6 +1,6 @@
 -- SCHEMA CHINH cua Accounting System: day la nguon dinh nghia SQL duy nhat.
 -- Tao database bang sql/00_create_database.sql, sau do chon database truoc khi chay file nay.
--- JDBC doc cac khoi BOOTSTRAP, V001, V002 tu chinh file nay. Maven dong goi file vao JAR.
+-- JDBC doc cac khoi BOOTSTRAP, V001, V002, V003 tu chinh file nay. Maven dong goi file vao JAR.
 -- Giu nguyen noi dung khoi da ap dung. Thay doi schema sau nay can migration moi.
 -- Chay bang MySQL client voi che do dung khi gap loi (khong dung --force).
 SET NAMES utf8mb4;
@@ -18,9 +18,10 @@ CREATE TABLE IF NOT EXISTS acc_schema_history (
 );
 -- END BOOTSTRAP
 
--- Checksum cua hai khoi ben duoi, duoc kiem tra tu dong trong test.
+-- Checksum cac khoi ben duoi, duoc kiem tra tu dong trong test.
 SET @acc_v001_checksum = '728f47e7fb96c36c067950034e4e3ec0a419d96e995b2f9ec4fd9bdd8c0e4f17';
 SET @acc_v002_checksum = '411d26653afa0db84156adae09145240753103ccc91785a3091b485935bf8c5d';
+SET @acc_v003_checksum = '258908c92725be54e4f8613e399a0c5b29d891a50e64a532379001e262ce148f';
 
 -- Chi khoi tao database trong hoac tiep tuc schema co lich su hop le.
 -- Neu co migration dang loi, dung lenh --db=resume-migration sau khi kiem tra.
@@ -28,16 +29,21 @@ SET @acc_schema_install_allowed =
     @acc_schema_install_lock = 1
     AND NOT EXISTS (
         SELECT 1 FROM acc_schema_history
-        WHERE success = FALSE OR version_no NOT IN (1, 2)
+        WHERE success = FALSE OR version_no NOT IN (1, 2, 3)
            OR checksum <> CASE version_no
                WHEN 1 THEN @acc_v001_checksum
                WHEN 2 THEN @acc_v002_checksum
+               WHEN 3 THEN @acc_v003_checksum
                ELSE ''
            END
     )
     AND (
         NOT EXISTS (SELECT 1 FROM acc_schema_history WHERE version_no = 2)
         OR EXISTS (SELECT 1 FROM acc_schema_history WHERE version_no = 1)
+    )
+    AND (
+        NOT EXISTS (SELECT 1 FROM acc_schema_history WHERE version_no = 3)
+        OR EXISTS (SELECT 1 FROM acc_schema_history WHERE version_no = 2)
     )
     AND (
         EXISTS (SELECT 1 FROM acc_schema_history)
@@ -266,6 +272,78 @@ CREATE TABLE IF NOT EXISTS acc_allocation_cancellations (
 UPDATE acc_schema_history
 SET success = TRUE, completed_at = DATE_FORMAT(UTC_TIMESTAMP(6), '%Y-%m-%dT%H:%i:%s.%fZ')
 WHERE version_no = 2 AND checksum = @acc_v002_checksum AND success = FALSE
+  AND @acc_schema_install_allowed = 1;
+
+INSERT INTO acc_schema_history (version_no, description, checksum, success, started_at)
+SELECT 3, 'Corrections and prepaid expenses', @acc_v003_checksum, FALSE,
+       DATE_FORMAT(UTC_TIMESTAMP(6), '%Y-%m-%dT%H:%i:%s.%fZ')
+WHERE @acc_schema_install_allowed = 1
+  AND NOT EXISTS (SELECT 1 FROM acc_schema_history WHERE version_no = 3);
+
+-- BEGIN V003
+CREATE TABLE IF NOT EXISTS acc_corrections (
+    id VARCHAR(36) PRIMARY KEY,
+    source_document_id VARCHAR(36) NOT NULL,
+    target_document_id VARCHAR(36) NOT NULL UNIQUE,
+    kind VARCHAR(10) NOT NULL,
+    reason VARCHAR(255) NOT NULL,
+    created_by BIGINT NOT NULL,
+    created_at VARCHAR(35) NOT NULL,
+    FOREIGN KEY (source_document_id) REFERENCES acc_vouchers(id),
+    FOREIGN KEY (target_document_id) REFERENCES acc_vouchers(id),
+    FOREIGN KEY (created_by) REFERENCES acc_users(id),
+    CHECK (kind IN ('ADJUSTMENT','REVERSAL')),
+    CHECK (source_document_id <> target_document_id)
+);
+CREATE TABLE IF NOT EXISTS acc_prepaid_plans (
+    id VARCHAR(36) PRIMARY KEY,
+    reference VARCHAR(32) NOT NULL UNIQUE,
+    source_entry_id VARCHAR(36) NOT NULL,
+    source_line_no INT NOT NULL,
+    expense_account_code VARCHAR(20) NOT NULL,
+    first_month VARCHAR(7) NOT NULL,
+    month_count INT NOT NULL,
+    created_by BIGINT NOT NULL,
+    created_at VARCHAR(35) NOT NULL,
+    FOREIGN KEY (source_entry_id, source_line_no) REFERENCES acc_journal_lines(entry_id, line_no),
+    FOREIGN KEY (expense_account_code) REFERENCES acc_accounts(code),
+    FOREIGN KEY (created_by) REFERENCES acc_users(id),
+    CHECK (month_count BETWEEN 1 AND 120)
+);
+CREATE TABLE IF NOT EXISTS acc_prepaid_schedule (
+    plan_id VARCHAR(36) NOT NULL,
+    month_key VARCHAR(7) NOT NULL,
+    amount DECIMAL(19,0) NOT NULL,
+    PRIMARY KEY (plan_id, month_key),
+    FOREIGN KEY (plan_id) REFERENCES acc_prepaid_plans(id),
+    CHECK (amount > 0)
+);
+CREATE TABLE IF NOT EXISTS acc_prepaid_allocations (
+    id VARCHAR(36) PRIMARY KEY,
+    plan_id VARCHAR(36) NOT NULL,
+    month_key VARCHAR(7) NOT NULL,
+    target_document_id VARCHAR(36) NOT NULL UNIQUE,
+    created_by BIGINT NOT NULL,
+    created_at VARCHAR(35) NOT NULL,
+    FOREIGN KEY (plan_id, month_key) REFERENCES acc_prepaid_schedule(plan_id, month_key),
+    FOREIGN KEY (target_document_id) REFERENCES acc_vouchers(id),
+    FOREIGN KEY (created_by) REFERENCES acc_users(id)
+);
+CREATE TABLE IF NOT EXISTS acc_prepaid_cancellations (
+    plan_id VARCHAR(36) PRIMARY KEY,
+    effective_date DATE NOT NULL,
+    reason VARCHAR(255) NOT NULL,
+    recorded_by BIGINT NOT NULL,
+    recorded_at VARCHAR(35) NOT NULL,
+    FOREIGN KEY (plan_id) REFERENCES acc_prepaid_plans(id),
+    FOREIGN KEY (recorded_by) REFERENCES acc_users(id),
+    CHECK (CHAR_LENGTH(TRIM(reason)) > 0)
+);
+-- END V003
+
+UPDATE acc_schema_history
+SET success = TRUE, completed_at = DATE_FORMAT(UTC_TIMESTAMP(6), '%Y-%m-%dT%H:%i:%s.%fZ')
+WHERE version_no = 3 AND checksum = @acc_v003_checksum AND success = FALSE
   AND @acc_schema_install_allowed = 1;
 
 DROP TEMPORARY TABLE IF EXISTS acc_schema_install_guard;

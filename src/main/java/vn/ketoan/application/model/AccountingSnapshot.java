@@ -10,12 +10,18 @@ import vn.ketoan.application.port.AccountingSession;
 import vn.ketoan.domain.Account;
 import vn.ketoan.domain.AccountingPeriod;
 import vn.ketoan.domain.AllocationCancellation;
+import vn.ketoan.domain.CorrectionBook;
+import vn.ketoan.domain.CorrectionRecord;
 import vn.ketoan.domain.DebtAllocation;
 import vn.ketoan.domain.JournalEntry;
 import vn.ketoan.domain.JournalLine;
 import vn.ketoan.domain.MoneyAccount;
 import vn.ketoan.domain.OpenItemBook;
 import vn.ketoan.domain.Partner;
+import vn.ketoan.domain.PrepaidAllocationRecord;
+import vn.ketoan.domain.PrepaidBook;
+import vn.ketoan.domain.PrepaidExpensePlan;
+import vn.ketoan.domain.PrepaidPlanCancellation;
 import vn.ketoan.domain.User;
 import vn.ketoan.domain.VoucherDocument;
 import vn.ketoan.domain.VoucherStatus;
@@ -24,7 +30,9 @@ import vn.ketoan.domain.VoucherStatus;
 public record AccountingSnapshot(List<Account> accounts, List<Partner> partners,
                                List<MoneyAccount> moneyAccounts, List<AccountingPeriod> periods,
                                List<User> users, List<VoucherDocument> documents, List<JournalEntry> journal,
-                               List<DebtAllocation> allocations, List<AllocationCancellation> cancellations) {
+                               List<DebtAllocation> allocations, List<AllocationCancellation> cancellations,
+                               List<CorrectionRecord> corrections, List<PrepaidExpensePlan> prepaidPlans,
+                               List<PrepaidPlanCancellation> prepaidCancellations, List<PrepaidAllocationRecord> prepaidAllocations) {
 
     public AccountingSnapshot {
         accounts = List.copyOf(accounts);
@@ -36,18 +44,23 @@ public record AccountingSnapshot(List<Account> accounts, List<Partner> partners,
         journal = List.copyOf(journal);
         allocations = List.copyOf(allocations);
         cancellations = List.copyOf(cancellations);
+        corrections = List.copyOf(corrections);
+        prepaidPlans = List.copyOf(prepaidPlans);
+        prepaidCancellations = List.copyOf(prepaidCancellations);
+        prepaidAllocations = List.copyOf(prepaidAllocations);
     }
 
     public static AccountingSnapshot empty() {
         return new AccountingSnapshot(List.of(), List.of(), List.of(), List.of(),
-                List.of(), List.of(), List.of(), List.of(), List.of());
+                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
     }
 
     public static AccountingSnapshot capture(AccountingSession session) {
         return new AccountingSnapshot(session.accounts().findAll(), session.partners().findAll(),
                 session.moneyAccounts().findAll(), session.periods().findAll(), session.users().findAll(),
                 session.documents().findAll(), session.journal().findAll(), session.allocations().findAll(),
-                session.allocations().findCancellations());
+                session.allocations().findCancellations(), session.corrections().findAll(), session.prepaidPlans().findAll(),
+                session.prepaidPlans().findCancellations(), session.prepaidAllocations().findAll());
     }
 
     public void validateIntegrity() {
@@ -97,5 +110,14 @@ public record AccountingSnapshot(List<Account> accounts, List<Partner> partners,
             throw new IllegalStateException("Allocation history references an unknown user");
         }
         new OpenItemBook(accounts, journal, allocations, cancellations);
+        if (corrections.stream().anyMatch(value -> !userIndex.containsKey(value.createdBy()))
+                || prepaidPlans.stream().anyMatch(value -> !userIndex.containsKey(value.createdBy()))
+                || prepaidCancellations.stream().anyMatch(value -> !userIndex.containsKey(value.recordedBy()))
+                || prepaidAllocations.stream().anyMatch(value -> !userIndex.containsKey(value.createdBy()))) {
+            throw new IllegalStateException("Correction or prepaid history references an unknown user");
+        }
+        CorrectionBook correctionBook = new CorrectionBook(accounts, documents, journal, corrections);
+        correctionBook.validateMatching(allocations, cancellations);
+        new PrepaidBook(accounts, documents, journal, prepaidPlans, prepaidCancellations, prepaidAllocations, correctionBook);
     }
 }
