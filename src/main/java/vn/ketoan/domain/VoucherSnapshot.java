@@ -28,6 +28,21 @@ public record VoucherSnapshot(VoucherType type, String reference, LocalDate docu
                 voucher.getPostingDate(), voucher.getDescription(), lines);
     }
 
+    /** Rebuilds the concrete subtype without checking current catalogs or reopening a historical period. */
+    public Voucher toVoucher() {
+        Draft draft = new Draft(reference, documentDate, postingDate, description, lines.stream()
+                .map(line -> new VoucherLine(line.accountCode(), line.side(), line.amount(),
+                        line.partnerCode(), line.moneyAccountCode())).toList());
+        VoucherCreator creator = switch (type) {
+            case REVENUE -> new RevenueCreator();
+            case EXPENSE -> new ExpenseCreator();
+            case RECEIPT -> new ReceiptCreator();
+            case PAYMENT -> new PaymentCreator();
+            case GENERAL -> new GeneralCreator();
+        };
+        return creator.create(draft);
+    }
+
     public record Line(String accountCode, BalanceSide side, Money amount,
                        String partnerCode, String moneyAccountCode) {
 

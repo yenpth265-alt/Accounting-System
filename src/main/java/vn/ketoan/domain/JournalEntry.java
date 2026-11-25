@@ -22,18 +22,21 @@ public final class JournalEntry {
     private final long postedBy;
     private final Instant postedAt;
 
-    private JournalEntry(UUID id, VoucherDocument approved, User actor, Instant time) {
+    private JournalEntry(UUID id, UUID sourceDocumentId, long sourceVersion, VoucherSnapshot content,
+                         long approvedBy, Instant approvedAt, long postedBy, Instant postedAt) {
         this.id = Objects.requireNonNull(id, "Journal id is required");
-        approved.requireActionAllowed(actor, VoucherAction.POSTED);
-        this.sourceDocumentId = approved.getId();
-        this.sourceVersion = approved.getVersion();
-        this.content = VoucherSnapshot.from(approved.getContent());
-        this.approvedBy = approved.getApprovedBy().orElseThrow();
-        this.approvedAt = approved.getApprovedAt().orElseThrow();
-        this.postedBy = actor.getId();
-        this.postedAt = Objects.requireNonNull(time, "Posting time is required");
-        if (time.isBefore(approved.getUpdatedAt())) {
-            throw new IllegalArgumentException("Posting time cannot precede approval");
+        this.sourceDocumentId = Objects.requireNonNull(sourceDocumentId, "Source document id is required");
+        this.sourceVersion = sourceVersion;
+        this.content = Objects.requireNonNull(content, "Journal content is required");
+        this.approvedBy = approvedBy;
+        this.approvedAt = Objects.requireNonNull(approvedAt, "Approval time is required");
+        this.postedBy = postedBy;
+        this.postedAt = Objects.requireNonNull(postedAt, "Posting time is required");
+        if (sourceVersion < 0 || approvedBy <= 0 || postedBy <= 0 || postedAt.isBefore(approvedAt)) {
+            throw new IllegalArgumentException("Journal source version, actors or timestamps are invalid");
+        }
+        if (!VoucherSnapshot.from(content.toVoucher()).equals(content)) {
+            throw new IllegalArgumentException("Journal content must be normalized");
         }
         List<JournalLine> numbered = new ArrayList<>();
         for (int index = 0; index < content.lines().size(); index++) {
@@ -50,7 +53,18 @@ public final class JournalEntry {
     public static JournalEntry fromApproved(UUID id, VoucherDocument approved, User actor, Instant time) {
         Objects.requireNonNull(approved, "Approved document is required");
         Objects.requireNonNull(actor, "Posting actor is required");
-        return new JournalEntry(id, approved, actor, time);
+        approved.requireActionAllowed(actor, VoucherAction.POSTED);
+        Objects.requireNonNull(time, "Posting time is required");
+        if (time.isBefore(approved.getUpdatedAt())) {
+            throw new IllegalArgumentException("Posting time cannot precede approval");
+        }
+        return new JournalEntry(id, approved.getId(), approved.getVersion(), VoucherSnapshot.from(approved.getContent()),
+                approved.getApprovedBy().orElseThrow(), approved.getApprovedAt().orElseThrow(), actor.getId(), time);
+    }
+
+    public static JournalEntry restore(UUID id, UUID sourceDocumentId, long sourceVersion, VoucherSnapshot content,
+                                       long approvedBy, Instant approvedAt, long postedBy, Instant postedAt) {
+        return new JournalEntry(id, sourceDocumentId, sourceVersion, content, approvedBy, approvedAt, postedBy, postedAt);
     }
 
     public UUID getId() {

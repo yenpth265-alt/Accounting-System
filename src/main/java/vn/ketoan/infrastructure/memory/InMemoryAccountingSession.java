@@ -6,6 +6,8 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 
+import vn.ketoan.application.model.AccountingSnapshot;
+
 import vn.ketoan.application.port.AccountRepository;
 import vn.ketoan.application.port.AccountingPeriodRepository;
 import vn.ketoan.application.port.AccountingSession;
@@ -40,7 +42,7 @@ final class InMemoryAccountingSession implements AccountingSession {
     private final InMemoryJournalRepository journalData = new InMemoryJournalRepository();
     private final InMemoryDebtAllocationRepository allocationData = new InMemoryDebtAllocationRepository();
 
-    InMemoryAccountingSession(InMemoryAccountingState committed) {
+    InMemoryAccountingSession(AccountingSnapshot committed) {
         committed.accounts().forEach(accountData::insert);
         committed.partners().forEach(partnerData::insert);
         committed.moneyAccounts().forEach(fundData::insert);
@@ -80,12 +82,12 @@ final class InMemoryAccountingSession implements AccountingSession {
         active = false;
     }
 
-    InMemoryAccountingState snapshot() {
+    AccountingSnapshot snapshot() {
         checkScope();
         if (rollbackOnly) {
             throw new IllegalStateException("Transaction is rollback-only after a repository failure");
         }
-        return new InMemoryAccountingState(accountData.findAll(), partnerData.findAll(), fundData.findAll(),
+        return new AccountingSnapshot(accountData.findAll(), partnerData.findAll(), fundData.findAll(),
                 periodData.findAll(), userData.findAll(), documentData.findAll(), journalData.findAll(),
                 allocationData.findAll(), allocationData.findCancellations());
     }

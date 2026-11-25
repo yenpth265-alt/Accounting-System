@@ -1,4 +1,4 @@
-package vn.ketoan.infrastructure.memory;
+package vn.ketoan.application.model;
 
 import java.util.List;
 import java.util.Map;
@@ -6,6 +6,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import vn.ketoan.application.port.AccountingSession;
 import vn.ketoan.domain.Account;
 import vn.ketoan.domain.AccountingPeriod;
 import vn.ketoan.domain.AllocationCancellation;
@@ -19,13 +20,13 @@ import vn.ketoan.domain.User;
 import vn.ketoan.domain.VoucherDocument;
 import vn.ketoan.domain.VoucherStatus;
 
-/** Immutable committed membership; every entity and nested collection is also immutable. */
-record InMemoryAccountingState(List<Account> accounts, List<Partner> partners,
+/** Immutable cross-repository snapshot used to check integrity for every storage adapter. */
+public record AccountingSnapshot(List<Account> accounts, List<Partner> partners,
                                List<MoneyAccount> moneyAccounts, List<AccountingPeriod> periods,
                                List<User> users, List<VoucherDocument> documents, List<JournalEntry> journal,
                                List<DebtAllocation> allocations, List<AllocationCancellation> cancellations) {
 
-    InMemoryAccountingState {
+    public AccountingSnapshot {
         accounts = List.copyOf(accounts);
         partners = List.copyOf(partners);
         moneyAccounts = List.copyOf(moneyAccounts);
@@ -37,12 +38,19 @@ record InMemoryAccountingState(List<Account> accounts, List<Partner> partners,
         cancellations = List.copyOf(cancellations);
     }
 
-    static InMemoryAccountingState empty() {
-        return new InMemoryAccountingState(List.of(), List.of(), List.of(), List.of(),
+    public static AccountingSnapshot empty() {
+        return new AccountingSnapshot(List.of(), List.of(), List.of(), List.of(),
                 List.of(), List.of(), List.of(), List.of(), List.of());
     }
 
-    void validateIntegrity() {
+    public static AccountingSnapshot capture(AccountingSession session) {
+        return new AccountingSnapshot(session.accounts().findAll(), session.partners().findAll(),
+                session.moneyAccounts().findAll(), session.periods().findAll(), session.users().findAll(),
+                session.documents().findAll(), session.journal().findAll(), session.allocations().findAll(),
+                session.allocations().findCancellations());
+    }
+
+    public void validateIntegrity() {
         Map<String, Account> accountIndex = accounts.stream()
                 .collect(Collectors.toMap(Account::getCode, Function.identity()));
         Map<String, Partner> partnerIndex = partners.stream()

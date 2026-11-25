@@ -1,0 +1,7 @@
+# Copy to database.local.properties, then enter your local connection settings.
+# ACCOUNTING_DB_URL / ACCOUNTING_DB_USER / ACCOUNTING_DB_PASSWORD override this file.
+# Create the database with sql/00_create_database.sql, then run the JAR with --db=migrate.
+# sql/01_schema.sql is the single schema source used by both MySQL and the application.
+db.url=jdbc:mysql://localhost:3306/accounting_system
+db.user=accounting_app
+db.password=

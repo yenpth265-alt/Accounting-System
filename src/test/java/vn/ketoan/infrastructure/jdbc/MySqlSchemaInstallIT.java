@@ -1,0 +1,121 @@
+package vn.ketoan.infrastructure.jdbc;
+
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.stream.Collectors;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import vn.ketoan.application.service.DebtService;
+import vn.ketoan.application.service.LedgerService;
+import vn.ketoan.demo.JdbcDemo;
+import vn.ketoan.domain.value.Money;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static vn.ketoan.PostingTestData.CLOCK;
+import static vn.ketoan.WorkflowTestData.VIEWER;
+
+/** Run explicitly with the disposable MySQL test configuration; SQL-client directives are MySQL specific. */
+class MySqlSchemaInstallIT {
+
+    @BeforeEach
+    void requireMySqlConfiguration() {
+        String config = System.getProperty("accounting.test.db.config");
+        assertTrue(config != null && !config.isBlank(), "Set accounting.test.db.config to an isolated MySQL test configuration");
+    }
+
+    @Test
+    void directSqlCreatesTheSameSchemaAndCanBeRepeatedWithoutChangingDataOrHistory() throws Exception {
+        try (JdbcTestDatabase database = new JdbcTestDatabase()) {
+            install(database, false);
+            SchemaMigrator migrator = new SchemaMigrator(database.connections());
+            assertEquals(0, migrator.migrate());
+            JdbcDemo.seedCatalogs(database.transactions());
+            try (PrintStream output = new PrintStream(new ByteArrayOutputStream())) {
+                JdbcDemo.run(output, database.transactions(), CLOCK);
+            }
+            String history = history(database);
+            install(database, false);
+            assertEquals(history, history(database));
+            assertEquals(0, migrator.migrate());
+            assertEquals(2, new LedgerService(database.transactions()).entries(VIEWER).size());
+            assertEquals(Money.of(6_000_000), new DebtService(database.transactions())
+                    .statement("131", "KH01", java.time.LocalDate.of(2026, 11, 25), VIEWER).netDebt());
+        }
+    }
+
+    @Test
+    void interruptionDuringDirectSqlKeepsDirtyVersionAndCanBeResumedByTheApplication() throws Exception {
+        try (JdbcTestDatabase database = new JdbcTestDatabase()) {
+            assertThrows(SQLException.class, () -> install(database, true));
+            try (Connection connection = database.connections().open(); var statement = connection.createStatement();
+                 var rows = statement.executeQuery("SELECT success FROM acc_schema_history WHERE version_no=2")) {
+                assertTrue(rows.next());
+                assertFalse(rows.getBoolean(1));
+            }
+            SchemaMigrator migrator = new SchemaMigrator(database.connections());
+            assertThrows(IllegalStateException.class, migrator::migrate);
+            assertEquals(1, migrator.migrate(true));
+            assertEquals(0, migrator.migrate());
+        }
+    }
+
+    @Test
+    void directSqlCannotOverwriteAnIncompatibleMigrationChecksum() throws Exception {
+        try (JdbcTestDatabase database = new JdbcTestDatabase()) {
+            new SchemaMigrator(database.connections()).migrate();
+            database.execute("UPDATE acc_schema_history SET checksum='changed' WHERE version_no=1");
+            String history = history(database);
+            assertThrows(SQLException.class, () -> install(database, false));
+            assertEquals(history, history(database));
+        }
+    }
+
+    @Test
+    void directSqlRefusesUnversionedAccountingTablesAndPreservesTheirData() throws Exception {
+        try (JdbcTestDatabase database = new JdbcTestDatabase()) {
+            database.execute("CREATE TABLE acc_unknown (id INT PRIMARY KEY)");
+            database.execute("INSERT INTO acc_unknown VALUES (7)");
+            assertThrows(SQLException.class, () -> install(database, false));
+            try (Connection connection = database.connections().open(); var statement = connection.createStatement();
+                 var rows = statement.executeQuery("SELECT id FROM acc_unknown")) {
+                assertTrue(rows.next());
+                assertEquals(7, rows.getInt(1));
+            }
+            assertThrows(IllegalStateException.class, () -> new SchemaMigrator(database.connections()).migrate());
+        }
+    }
+
+    private void install(JdbcTestDatabase database, boolean interrupt) throws SQLException {
+        String script = SchemaSql.source().lines().filter(line -> !line.stripLeading().startsWith("--"))
+                .collect(Collectors.joining("\n"));
+        try (Connection connection = database.connections().open(); var statement = connection.createStatement()) {
+            for (String sql : script.split(";")) {
+                if (sql.isBlank()) { continue; }
+                if (interrupt && sql.contains("CREATE TABLE IF NOT EXISTS acc_journal_lines")) {
+                    throw new SQLException("Simulated SQL-client interruption", "HY000");
+                }
+                statement.execute(sql.strip());
+            }
+        }
+    }
+
+    private String history(JdbcTestDatabase database) throws SQLException {
+        StringBuilder result = new StringBuilder();
+        try (Connection connection = database.connections().open(); var statement = connection.createStatement();
+             var rows = statement.executeQuery("SELECT * FROM acc_schema_history ORDER BY version_no")) {
+            while (rows.next()) {
+                result.append(rows.getInt("version_no")).append('|').append(rows.getString("checksum"))
+                        .append('|').append(rows.getBoolean("success")).append('|').append(rows.getString("started_at"))
+                        .append('|').append(rows.getString("completed_at")).append('\n');
+            }
+        }
+        return result.toString();
+    }
+}

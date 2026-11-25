@@ -1,0 +1,51 @@
+package vn.ketoan.infrastructure.jdbc;
+
+import java.sql.Connection;
+
+import vn.ketoan.application.port.AccountRepository;
+import vn.ketoan.application.port.AccountingPeriodRepository;
+import vn.ketoan.application.port.AccountingSession;
+import vn.ketoan.application.port.DebtAllocationRepository;
+import vn.ketoan.application.port.JournalRepository;
+import vn.ketoan.application.port.MoneyAccountRepository;
+import vn.ketoan.application.port.PartnerRepository;
+import vn.ketoan.application.port.UserRepository;
+import vn.ketoan.application.port.VoucherDocumentRepository;
+
+final class JdbcAccountingSession implements AccountingSession {
+
+    private final JdbcContext context;
+    private final AccountRepository accounts;
+    private final PartnerRepository partners;
+    private final MoneyAccountRepository funds;
+    private final AccountingPeriodRepository periods;
+    private final UserRepository users;
+    private final VoucherDocumentRepository documents;
+    private final JournalRepository journal;
+    private final DebtAllocationRepository allocations;
+
+    JdbcAccountingSession(Connection connection) {
+        context = new JdbcContext(connection);
+        accounts = new JdbcAccountRepository(context);
+        partners = new JdbcPartnerRepository(context);
+        funds = new JdbcMoneyAccountRepository(context);
+        periods = new JdbcAccountingPeriodRepository(context);
+        users = new JdbcUserRepository(context);
+        documents = new JdbcVoucherDocumentRepository(context);
+        journal = new JdbcJournalRepository(context);
+        allocations = new JdbcDebtAllocationRepository(context);
+    }
+
+    void abort() { context.abort(); }
+    void requireCommittable() { context.requireCommittable(); }
+    void close() { context.close(); }
+
+    @Override public AccountRepository accounts() { context.checkScope(); return accounts; }
+    @Override public PartnerRepository partners() { context.checkScope(); return partners; }
+    @Override public MoneyAccountRepository moneyAccounts() { context.checkScope(); return funds; }
+    @Override public AccountingPeriodRepository periods() { context.checkScope(); return periods; }
+    @Override public UserRepository users() { context.checkScope(); return users; }
+    @Override public VoucherDocumentRepository documents() { context.checkScope(); return documents; }
+    @Override public JournalRepository journal() { context.checkScope(); return journal; }
+    @Override public DebtAllocationRepository allocations() { context.checkScope(); return allocations; }
+}

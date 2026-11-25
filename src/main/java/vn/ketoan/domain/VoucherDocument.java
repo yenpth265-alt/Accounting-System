@@ -50,6 +50,54 @@ public final class VoucherDocument {
                 0, time, time, List.of(entry));
     }
 
+    /** Restores persisted facts; current user roles and catalog activity do not rewrite history. */
+    public static VoucherDocument restore(UUID id, List<VoucherHistoryEntry> history) {
+        List<VoucherHistoryEntry> entries = List.copyOf(history);
+        if (entries.isEmpty()) {
+            throw new IllegalArgumentException("A stored voucher requires its creation history");
+        }
+        VoucherHistoryEntry first = entries.getFirst();
+        if (first.version() != 0 || first.action() != VoucherAction.CREATED
+                || first.fromStatus() != null || first.toStatus() != VoucherStatus.DRAFT) {
+            throw new IllegalArgumentException("Stored history must start with draft creation");
+        }
+        for (int index = 1; index < entries.size(); index++) {
+            VoucherHistoryEntry previous = entries.get(index - 1);
+            VoucherHistoryEntry next = entries.get(index);
+            boolean ownerOnly = next.action() == VoucherAction.EDITED || next.action() == VoucherAction.SUBMITTED;
+            boolean independent = next.action() == VoucherAction.RETURNED || next.action() == VoucherAction.APPROVED
+                    || next.action() == VoucherAction.APPROVAL_WITHDRAWN || next.action() == VoucherAction.POSTED;
+            if (next.version() != index || next.fromStatus() != previous.toStatus()
+                    || next.occurredAt().isBefore(previous.occurredAt()) || !validStoredTransition(next)
+                    || (ownerOnly && next.actorId() != first.actorId())
+                    || (independent && next.actorId() == first.actorId())
+                    || next.content().type() != first.content().type()
+                    || !next.content().reference().equals(first.content().reference())
+                    || (next.action() != VoucherAction.EDITED && !next.content().equals(previous.content()))) {
+                throw new IllegalArgumentException("Stored voucher history is inconsistent");
+            }
+            next.content().toVoucher();
+        }
+        first.content().toVoucher();
+        VoucherHistoryEntry last = entries.getLast();
+        return new VoucherDocument(id, last.content().toVoucher(), first.actorId(), last.toStatus(),
+                last.version(), first.occurredAt(), last.occurredAt(), entries);
+    }
+
+    private static boolean validStoredTransition(VoucherHistoryEntry entry) {
+        boolean editable = entry.fromStatus() == VoucherStatus.DRAFT || entry.fromStatus() == VoucherStatus.RETURNED;
+        return switch (entry.action()) {
+            case CREATED -> false;
+            case EDITED -> editable && entry.toStatus() == entry.fromStatus();
+            case SUBMITTED -> editable && entry.toStatus() == VoucherStatus.PENDING_APPROVAL;
+            case RETURNED -> entry.fromStatus() == VoucherStatus.PENDING_APPROVAL && entry.toStatus() == VoucherStatus.RETURNED;
+            case APPROVED -> entry.fromStatus() == VoucherStatus.PENDING_APPROVAL && entry.toStatus() == VoucherStatus.APPROVED;
+            case APPROVAL_WITHDRAWN -> entry.fromStatus() == VoucherStatus.APPROVED && entry.toStatus() == VoucherStatus.RETURNED;
+            case POSTED -> entry.fromStatus() == VoucherStatus.APPROVED && entry.toStatus() == VoucherStatus.POSTED;
+            case CANCELLED -> editable && entry.toStatus() == VoucherStatus.CANCELLED;
+        };
+    }
+
     public void requireActionAllowed(User actor, VoucherAction action) {
         Objects.requireNonNull(actor, "Actor is required");
         Objects.requireNonNull(action, "Action is required");

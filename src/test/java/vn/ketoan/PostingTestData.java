@@ -35,6 +35,11 @@ public final class PostingTestData {
 
     public static InMemoryUnitOfWork transactions() {
         InMemoryUnitOfWork transactions = new InMemoryUnitOfWork();
+        seed(transactions);
+        return transactions;
+    }
+
+    public static void seed(UnitOfWork transactions) {
         transactions.execute(session -> {
             VoucherTestData.accounts().forEach(session.accounts()::insert);
             VoucherTestData.partners().forEach(session.partners()::insert);
@@ -48,7 +53,6 @@ public final class PostingTestData {
             session.users().insert(user(COMBINED, UserRole.ACCOUNTANT, UserRole.CHIEF));
             return null;
         });
-        return transactions;
     }
 
     public static VoucherValidatorFactory validators() {
