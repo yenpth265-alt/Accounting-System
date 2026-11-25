@@ -5,6 +5,8 @@ import java.time.Clock;
 
 import vn.ketoan.application.model.AccountingSnapshot;
 import vn.ketoan.application.port.SqlConnectionFactory;
+import vn.ketoan.application.service.ReportingService;
+import vn.ketoan.domain.report.ReportPeriod;
 import vn.ketoan.demo.JdbcDemo;
 import vn.ketoan.demo.CorrectionDemo;
 import vn.ketoan.demo.PrepaidDemo;
@@ -15,6 +17,12 @@ import vn.ketoan.infrastructure.jdbc.SchemaMigrator;
 public final class DatabaseCommands {
 
     private DatabaseCommands() {
+    }
+
+    public static void reports(ReportPeriod period, PrintStream output, SqlConnectionFactory connections) {
+        var reporting = new ReportingService(new JdbcUnitOfWork(connections));
+        ReportPrinter.statements(output, reporting.statements(period, 4));
+        ReportPrinter.journal(output, reporting.journal(period, 4));
     }
 
     public static void run(String option, PrintStream output, SqlConnectionFactory connections) {

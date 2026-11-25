@@ -103,6 +103,9 @@ class MySqlSchemaInstallIT {
             assertTrue(command(database, "--db=migrate").contains("Migrations applied: 4"));
             assertTrue(command(database, "--demo=closing").contains("Period status=CLOSED"));
             assertTrue(command(database, "--demo=closing").contains("Closing decisions=2"));
+            String reports = command(database, "--reports=2026-11");
+            assertTrue(reports.contains("Revenue=10000000; expenses=3000000; profit=7000000"));
+            assertTrue(reports.contains("Total assets=10000000; liabilities=3000000; equity=7000000"));
             assertTrue(command(database, "--db=check").contains("Closing batches=1; closing decisions=2"));
             assertEquals(5, new LedgerService(database.transactions()).entries(VIEWER).size());
             assertEquals(Money.of(-7_000_000), new LedgerService(database.transactions())
