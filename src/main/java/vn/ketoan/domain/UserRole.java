@@ -4,10 +4,10 @@ import java.util.Set;
 
 public enum UserRole {
     ACCOUNTANT(Set.of(Permission.VIEW_VOUCHERS, Permission.CREATE_VOUCHER,
-            Permission.EDIT_VOUCHER, Permission.SUBMIT_VOUCHER, Permission.CANCEL_VOUCHER)),
+            Permission.EDIT_VOUCHER, Permission.SUBMIT_VOUCHER, Permission.CANCEL_VOUCHER, Permission.PREPARE_CLOSING)),
     CHIEF(Set.of(Permission.VIEW_VOUCHERS, Permission.REVIEW_VOUCHER,
             Permission.WITHDRAW_APPROVAL, Permission.POST_VOUCHER, Permission.CANCEL_VOUCHER,
-            Permission.ALLOCATE_DEBT, Permission.CANCEL_DEBT_ALLOCATION)),
+            Permission.ALLOCATE_DEBT, Permission.CANCEL_DEBT_ALLOCATION, Permission.CLOSE_PERIOD)),
     VIEWER(Set.of(Permission.VIEW_VOUCHERS)),
     ADMIN(Set.of());
 

@@ -7,6 +7,7 @@ import vn.ketoan.application.port.AccountingPeriodRepository;
 import vn.ketoan.application.port.AccountingSession;
 import vn.ketoan.application.port.DebtAllocationRepository;
 import vn.ketoan.application.port.CorrectionRepository;
+import vn.ketoan.application.port.ClosingRepository;
 import vn.ketoan.application.port.JournalRepository;
 import vn.ketoan.application.port.MoneyAccountRepository;
 import vn.ketoan.application.port.PartnerRepository;
@@ -29,6 +30,7 @@ final class JdbcAccountingSession implements AccountingSession {
     private final CorrectionRepository corrections;
     private final PrepaidPlanRepository prepaidPlans;
     private final PrepaidAllocationRepository prepaidAllocations;
+    private final ClosingRepository closings;
 
     JdbcAccountingSession(Connection connection) {
         context = new JdbcContext(connection);
@@ -43,6 +45,7 @@ final class JdbcAccountingSession implements AccountingSession {
         corrections = new JdbcCorrectionRepository(context);
         prepaidPlans = new JdbcPrepaidPlanRepository(context);
         prepaidAllocations = new JdbcPrepaidAllocationRepository(context);
+        closings = new JdbcClosingRepository(context);
     }
 
     void abort() { context.abort(); }
@@ -60,4 +63,5 @@ final class JdbcAccountingSession implements AccountingSession {
     @Override public CorrectionRepository corrections() { context.checkScope(); return corrections; }
     @Override public PrepaidPlanRepository prepaidPlans() { context.checkScope(); return prepaidPlans; }
     @Override public PrepaidAllocationRepository prepaidAllocations() { context.checkScope(); return prepaidAllocations; }
+    @Override public ClosingRepository closings() { context.checkScope(); return closings; }
 }

@@ -13,6 +13,7 @@ import vn.ketoan.application.port.AccountingPeriodRepository;
 import vn.ketoan.application.port.AccountingSession;
 import vn.ketoan.application.port.DebtAllocationRepository;
 import vn.ketoan.application.port.CorrectionRepository;
+import vn.ketoan.application.port.ClosingRepository;
 import vn.ketoan.application.port.JournalRepository;
 import vn.ketoan.application.port.MoneyAccountRepository;
 import vn.ketoan.application.port.PartnerRepository;
@@ -25,6 +26,8 @@ import vn.ketoan.domain.AccountingPeriod;
 import vn.ketoan.domain.AllocationCancellation;
 import vn.ketoan.domain.DebtAllocation;
 import vn.ketoan.domain.CorrectionRecord;
+import vn.ketoan.domain.ClosingBatch;
+import vn.ketoan.domain.ClosingEvent;
 import vn.ketoan.domain.JournalEntry;
 import vn.ketoan.domain.MoneyAccount;
 import vn.ketoan.domain.Partner;
@@ -51,6 +54,7 @@ final class InMemoryAccountingSession implements AccountingSession {
     private final InMemoryCorrectionRepository correctionData = new InMemoryCorrectionRepository();
     private final InMemoryPrepaidPlanRepository prepaidPlanData = new InMemoryPrepaidPlanRepository();
     private final InMemoryPrepaidAllocationRepository prepaidAllocationData = new InMemoryPrepaidAllocationRepository();
+    private final InMemoryClosingRepository closingData = new InMemoryClosingRepository();
 
     InMemoryAccountingSession(AccountingSnapshot committed) {
         committed.accounts().forEach(accountData::insert);
@@ -66,6 +70,8 @@ final class InMemoryAccountingSession implements AccountingSession {
         committed.prepaidPlans().forEach(prepaidPlanData::append);
         committed.prepaidCancellations().forEach(prepaidPlanData::appendCancellation);
         committed.prepaidAllocations().forEach(prepaidAllocationData::append);
+        committed.closingBatches().forEach(closingData::append);
+        committed.closingEvents().forEach(closingData::appendEvent);
     }
 
     private void checkScope() {
@@ -104,7 +110,8 @@ final class InMemoryAccountingSession implements AccountingSession {
         return new AccountingSnapshot(accountData.findAll(), partnerData.findAll(), fundData.findAll(),
                 periodData.findAll(), userData.findAll(), documentData.findAll(), journalData.findAll(),
                 allocationData.findAll(), allocationData.findCancellations(), correctionData.findAll(),
-                prepaidPlanData.findAll(), prepaidPlanData.findCancellations(), prepaidAllocationData.findAll());
+                prepaidPlanData.findAll(), prepaidPlanData.findCancellations(), prepaidAllocationData.findAll(),
+                closingData.findAll(), closingData.findEvents());
     }
 
     private final AccountRepository accountView = new AccountRepository() {
@@ -336,4 +343,14 @@ final class InMemoryAccountingSession implements AccountingSession {
     @Override public CorrectionRepository corrections() { checkScope(); return correctionView; }
     @Override public PrepaidPlanRepository prepaidPlans() { checkScope(); return prepaidPlanView; }
     @Override public PrepaidAllocationRepository prepaidAllocations() { checkScope(); return prepaidAllocationView; }
+
+    private final ClosingRepository closingView = new ClosingRepository() {
+        @Override public Optional<ClosingBatch> findById(UUID id) { return access(() -> closingData.findById(id)); }
+        @Override public Optional<ClosingBatch> findByDocumentId(UUID id) { return access(() -> closingData.findByDocumentId(id)); }
+        @Override public List<ClosingBatch> findAll() { return access(closingData::findAll); }
+        @Override public void append(ClosingBatch batch) { mutate(() -> closingData.append(batch)); }
+        @Override public List<ClosingEvent> findEvents() { return access(closingData::findEvents); }
+        @Override public void appendEvent(ClosingEvent event) { mutate(() -> closingData.appendEvent(event)); }
+    };
+    @Override public ClosingRepository closings() { checkScope(); return closingView; }
 }

@@ -8,6 +8,7 @@ import vn.ketoan.application.port.SqlConnectionFactory;
 import vn.ketoan.demo.JdbcDemo;
 import vn.ketoan.demo.CorrectionDemo;
 import vn.ketoan.demo.PrepaidDemo;
+import vn.ketoan.demo.ClosingDemo;
 import vn.ketoan.infrastructure.jdbc.JdbcUnitOfWork;
 import vn.ketoan.infrastructure.jdbc.SchemaMigrator;
 
@@ -32,10 +33,12 @@ public final class DatabaseCommands {
                         state.journal().size(), state.allocations().size(), state.cancellations().size());
                 output.printf("Corrections=%d; prepaid plans=%d; prepaid installments=%d%n",
                         state.corrections().size(), state.prepaidPlans().size(), state.prepaidAllocations().size());
+                output.printf("Closing batches=%d; closing decisions=%d%n", state.closingBatches().size(), state.closingEvents().size());
             }
             case "--demo=jdbc" -> JdbcDemo.run(output, new JdbcUnitOfWork(connections), Clock.systemUTC());
             case "--demo=corrections" -> CorrectionDemo.run(output, new JdbcUnitOfWork(connections), Clock.systemUTC());
             case "--demo=prepaid" -> PrepaidDemo.run(output, new JdbcUnitOfWork(connections), Clock.systemUTC());
+            case "--demo=closing" -> ClosingDemo.run(output, new JdbcUnitOfWork(connections), Clock.systemUTC());
             default -> throw new IllegalArgumentException("Unsupported database option");
         }
     }

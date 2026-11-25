@@ -25,13 +25,13 @@ class SchemaMigratorTest {
     void packagedSchemaMatchesTheOnlySourceAndInstallerChecksumsMatchMigrationSections() throws Exception {
         String source = SchemaSql.source();
         assertEquals(Files.readString(Path.of("sql/01_schema.sql")).replace("\r\n", "\n"), source);
-        for (String section : new String[]{"V001", "V002", "V003"}) {
+        for (String section : new String[]{"V001", "V002", "V003", "V004"}) {
             var declaration = Pattern.compile("SET @acc_" + section.toLowerCase()
                     + "_checksum = '([a-f0-9]{64})';").matcher(source);
             assertTrue(declaration.find());
             assertEquals(SchemaSql.checksum(SchemaSql.section(section)), declaration.group(1));
         }
-        assertEquals(21, Pattern.compile("(?m)^CREATE TABLE IF NOT EXISTS acc_").matcher(source).results().count());
+        assertEquals(25, Pattern.compile("(?m)^CREATE TABLE IF NOT EXISTS acc_").matcher(source).results().count());
     }
 
     @Test
@@ -40,7 +40,7 @@ class SchemaMigratorTest {
             database.execute("CREATE TABLE legacy_marker (id INT PRIMARY KEY)");
             database.execute("INSERT INTO legacy_marker VALUES (7)");
             SchemaMigrator migrator = new SchemaMigrator(database.connections());
-            assertEquals(3, migrator.migrate());
+            assertEquals(4, migrator.migrate());
             assertEquals(0, migrator.migrate());
             database.transactions().execute(session -> {
                 assertEquals(0, session.accounts().findAll().size());
@@ -81,7 +81,7 @@ class SchemaMigratorTest {
             }
             assertThrows(IllegalStateException.class, () -> new SchemaMigrator(database.connections()).migrate());
             assertThrows(IllegalStateException.class, () -> database.transactions().execute(session -> null));
-            assertEquals(2, new SchemaMigrator(database.connections()).migrate(true));
+            assertEquals(3, new SchemaMigrator(database.connections()).migrate(true));
             assertEquals(0, new SchemaMigrator(database.connections()).migrate());
             assertEquals(0, database.transactions().<Integer>execute(session -> session.journal().findAll().size()));
         }

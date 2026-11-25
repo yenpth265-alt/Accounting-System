@@ -2,8 +2,13 @@ package vn.ketoan.infrastructure.jdbc;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -61,7 +66,7 @@ class MySqlSchemaInstallIT {
             }
             SchemaMigrator migrator = new SchemaMigrator(database.connections());
             assertThrows(IllegalStateException.class, migrator::migrate);
-            assertEquals(2, migrator.migrate(true));
+            assertEquals(3, migrator.migrate(true));
             assertEquals(0, migrator.migrate());
         }
     }
@@ -90,6 +95,42 @@ class MySqlSchemaInstallIT {
             }
             assertThrows(IllegalStateException.class, () -> new SchemaMigrator(database.connections()).migrate());
         }
+    }
+
+    @Test
+    void commandLineCanMigrateAndRepeatAClosingInAnIsolatedDatabase() throws Exception {
+        try (JdbcTestDatabase database = new JdbcTestDatabase()) {
+            assertTrue(command(database, "--db=migrate").contains("Migrations applied: 4"));
+            assertTrue(command(database, "--demo=closing").contains("Period status=CLOSED"));
+            assertTrue(command(database, "--demo=closing").contains("Closing decisions=2"));
+            assertTrue(command(database, "--db=check").contains("Closing batches=1; closing decisions=2"));
+            assertEquals(5, new LedgerService(database.transactions()).entries(VIEWER).size());
+            assertEquals(Money.of(-7_000_000), new LedgerService(database.transactions())
+                    .netBalance("4212", java.time.LocalDate.of(2026, 11, 30), VIEWER));
+        }
+    }
+
+    private String command(JdbcTestDatabase database, String option) throws Exception {
+        Properties settings = new Properties();
+        try (var input = Files.newBufferedReader(Path.of(System.getProperty("accounting.test.db.config")), StandardCharsets.UTF_8)) {
+            settings.load(input);
+        }
+        String url;
+        try (var connection = database.connections().open()) { url = connection.getMetaData().getURL(); }
+        Path java = Path.of(System.getProperty("java.home"), "bin", System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java");
+        String classpath = System.getProperty("surefire.test.class.path", System.getProperty("java.class.path"));
+        ProcessBuilder builder = new ProcessBuilder(java.toString(), "-cp", classpath, "vn.ketoan.Main", option).redirectErrorStream(true);
+        builder.environment().put("ACCOUNTING_DB_URL", url);
+        builder.environment().put("ACCOUNTING_DB_USER", settings.getProperty("user"));
+        builder.environment().put("ACCOUNTING_DB_PASSWORD", settings.getProperty("password"));
+        Process process = builder.start();
+        if (!process.waitFor(45, TimeUnit.SECONDS)) {
+            process.destroyForcibly();
+            throw new IllegalStateException("Isolated CLI test timed out");
+        }
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertEquals(0, process.exitValue(), output);
+        return output;
     }
 
     private void install(JdbcTestDatabase database, boolean interrupt) throws SQLException {

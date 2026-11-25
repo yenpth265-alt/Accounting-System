@@ -24,7 +24,8 @@ public final class SchemaMigrator {
     private static final List<Migration> MIGRATIONS = List.of(
             migration(1, "Catalogs and vouchers", "V001"),
             migration(2, "Journal and allocations", "V002"),
-            migration(3, "Corrections and prepaid expenses", "V003"));
+            migration(3, "Corrections and prepaid expenses", "V003"),
+            migration(4, "Period closing", "V004"));
     private final SqlConnectionFactory connections;
 
     public SchemaMigrator(SqlConnectionFactory connections) {

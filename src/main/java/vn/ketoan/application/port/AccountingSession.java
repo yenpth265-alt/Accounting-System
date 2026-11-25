@@ -24,4 +24,6 @@ public interface AccountingSession {
     PrepaidPlanRepository prepaidPlans();
 
     PrepaidAllocationRepository prepaidAllocations();
+
+    ClosingRepository closings();
 }

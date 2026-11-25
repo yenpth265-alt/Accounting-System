@@ -30,6 +30,7 @@ public final class Main {
             System.out.println("MySQL: configure database.local.properties or ACCOUNTING_DB_URL/USER/PASSWORD.");
             System.out.println("Run --db=migrate, --db=seed-demo, then --demo=jdbc for a persistent sample.");
             System.out.println("Run --demo=corrections or --demo=prepaid for persistent adjustments, reversals and prepaid expenses.");
+            System.out.println("Run --demo=closing to prepare, review, post and lock the November 2026 demo period in MySQL.");
             System.out.println("Run --db=check to inspect stored data; --db=resume-migration resumes an inspected failed migration.");
             return;
         }
@@ -58,14 +59,14 @@ public final class Main {
             return;
         }
         if (args.length == 1 && Set.of("--db=migrate", "--db=resume-migration", "--db=seed-demo", "--db=check", "--demo=jdbc",
-                "--demo=corrections", "--demo=prepaid").contains(args[0])) {
+                "--demo=corrections", "--demo=prepaid", "--demo=closing").contains(args[0])) {
             DatabaseSettings settings = DatabaseSettings.load(Path.of("database.local.properties"), System.getenv());
             DatabaseCommands.run(args[0], System.out, new DatabaseConnection(settings));
             return;
         }
         throw new IllegalArgumentException(
                 "Supported options: --help, --demo=master-data, --demo=vouchers, --demo=workflow, "
-                        + "--demo=posting, --demo=recognition, --demo=settlement, --demo=jdbc, --demo=corrections, --demo=prepaid, "
+                        + "--demo=posting, --demo=recognition, --demo=settlement, --demo=jdbc, --demo=corrections, --demo=prepaid, --demo=closing, "
                         + "--db=migrate, --db=resume-migration, --db=seed-demo, --db=check");
     }
 }

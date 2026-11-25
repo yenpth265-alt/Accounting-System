@@ -11,6 +11,6 @@ final class PostingPolicies {
     }
 
     static List<PostingPolicy> standard() {
-        return List.of(new CorrectionPostingPolicy(), new PrepaidPostingPolicy());
+        return List.of(new CorrectionPostingPolicy(), new PrepaidPostingPolicy(), new ClosingPostingPolicy());
     }
 }

@@ -12,6 +12,9 @@ import vn.ketoan.domain.AccountingPeriod;
 import vn.ketoan.domain.AllocationCancellation;
 import vn.ketoan.domain.CorrectionBook;
 import vn.ketoan.domain.CorrectionRecord;
+import vn.ketoan.domain.ClosingBatch;
+import vn.ketoan.domain.ClosingBook;
+import vn.ketoan.domain.ClosingEvent;
 import vn.ketoan.domain.DebtAllocation;
 import vn.ketoan.domain.JournalEntry;
 import vn.ketoan.domain.JournalLine;
@@ -32,7 +35,8 @@ public record AccountingSnapshot(List<Account> accounts, List<Partner> partners,
                                List<User> users, List<VoucherDocument> documents, List<JournalEntry> journal,
                                List<DebtAllocation> allocations, List<AllocationCancellation> cancellations,
                                List<CorrectionRecord> corrections, List<PrepaidExpensePlan> prepaidPlans,
-                               List<PrepaidPlanCancellation> prepaidCancellations, List<PrepaidAllocationRecord> prepaidAllocations) {
+                               List<PrepaidPlanCancellation> prepaidCancellations, List<PrepaidAllocationRecord> prepaidAllocations,
+                               List<ClosingBatch> closingBatches, List<ClosingEvent> closingEvents) {
 
     public AccountingSnapshot {
         accounts = List.copyOf(accounts);
@@ -48,11 +52,13 @@ public record AccountingSnapshot(List<Account> accounts, List<Partner> partners,
         prepaidPlans = List.copyOf(prepaidPlans);
         prepaidCancellations = List.copyOf(prepaidCancellations);
         prepaidAllocations = List.copyOf(prepaidAllocations);
+        closingBatches = List.copyOf(closingBatches);
+        closingEvents = List.copyOf(closingEvents);
     }
 
     public static AccountingSnapshot empty() {
         return new AccountingSnapshot(List.of(), List.of(), List.of(), List.of(),
-                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
     }
 
     public static AccountingSnapshot capture(AccountingSession session) {
@@ -60,7 +66,7 @@ public record AccountingSnapshot(List<Account> accounts, List<Partner> partners,
                 session.moneyAccounts().findAll(), session.periods().findAll(), session.users().findAll(),
                 session.documents().findAll(), session.journal().findAll(), session.allocations().findAll(),
                 session.allocations().findCancellations(), session.corrections().findAll(), session.prepaidPlans().findAll(),
-                session.prepaidPlans().findCancellations(), session.prepaidAllocations().findAll());
+                session.prepaidPlans().findCancellations(), session.prepaidAllocations().findAll(), session.closings().findAll(), session.closings().findEvents());
     }
 
     public void validateIntegrity() {
@@ -119,5 +125,10 @@ public record AccountingSnapshot(List<Account> accounts, List<Partner> partners,
         CorrectionBook correctionBook = new CorrectionBook(accounts, documents, journal, corrections);
         correctionBook.validateMatching(allocations, cancellations);
         new PrepaidBook(accounts, documents, journal, prepaidPlans, prepaidCancellations, prepaidAllocations, correctionBook);
+        if (closingBatches.stream().anyMatch(value -> !userIndex.containsKey(value.preparedBy()))
+                || closingEvents.stream().anyMatch(value -> !userIndex.containsKey(value.actorId()))) {
+            throw new IllegalStateException("Closing history references an unknown user");
+        }
+        new ClosingBook(accounts, periods, documents, journal, closingBatches, closingEvents, corrections, prepaidPlans, prepaidAllocations);
     }
 }
