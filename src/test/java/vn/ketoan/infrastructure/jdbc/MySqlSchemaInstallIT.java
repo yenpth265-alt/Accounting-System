@@ -66,7 +66,7 @@ class MySqlSchemaInstallIT {
             }
             SchemaMigrator migrator = new SchemaMigrator(database.connections());
             assertThrows(IllegalStateException.class, migrator::migrate);
-            assertEquals(3, migrator.migrate(true));
+            assertEquals(4, migrator.migrate(true));
             assertEquals(0, migrator.migrate());
         }
     }
@@ -100,12 +100,18 @@ class MySqlSchemaInstallIT {
     @Test
     void commandLineCanMigrateAndRepeatAClosingInAnIsolatedDatabase() throws Exception {
         try (JdbcTestDatabase database = new JdbcTestDatabase()) {
-            assertTrue(command(database, "--db=migrate").contains("Migrations applied: 4"));
+            assertTrue(command(database, "--db=migrate").contains("Migrations applied: 5"));
             assertTrue(command(database, "--demo=closing").contains("Period status=CLOSED"));
             assertTrue(command(database, "--demo=closing").contains("Closing decisions=2"));
             String reports = command(database, "--reports=2026-11");
             assertTrue(reports.contains("Revenue=10000000; expenses=3000000; profit=7000000"));
             assertTrue(reports.contains("Total assets=10000000; liabilities=3000000; equity=7000000"));
+            assertTrue(command(database, "--report-save=2026-11").contains("number=1"));
+            var version = database.transactions().execute(session -> session.reportVersions().findAll().getFirst());
+            assertTrue(command(database, "--report-view=" + version.id()).contains("FROZEN REPORT"));
+            assertTrue(command(database, "--report-publish=" + version.id()).contains("Published report version="));
+            assertTrue(command(database, "--report-publish=" + version.id()).contains("Published report version="));
+            assertEquals(1, database.transactions().<Integer>execute(session -> session.reportVersions().findPublications().size()));
             assertTrue(command(database, "--db=check").contains("Closing batches=1; closing decisions=2"));
             assertEquals(5, new LedgerService(database.transactions()).entries(VIEWER).size());
             assertEquals(Money.of(-7_000_000), new LedgerService(database.transactions())

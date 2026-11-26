@@ -8,6 +8,9 @@ import vn.ketoan.application.port.AccountingSession;
 import vn.ketoan.application.port.DebtAllocationRepository;
 import vn.ketoan.application.port.CorrectionRepository;
 import vn.ketoan.application.port.ClosingRepository;
+import vn.ketoan.application.port.CashFlowClassificationRepository;
+import vn.ketoan.application.port.ReportVersionRepository;
+import vn.ketoan.infrastructure.report.XmlReportDocumentCodec;
 import vn.ketoan.application.port.JournalRepository;
 import vn.ketoan.application.port.MoneyAccountRepository;
 import vn.ketoan.application.port.PartnerRepository;
@@ -31,6 +34,8 @@ final class JdbcAccountingSession implements AccountingSession {
     private final PrepaidPlanRepository prepaidPlans;
     private final PrepaidAllocationRepository prepaidAllocations;
     private final ClosingRepository closings;
+    private final CashFlowClassificationRepository cashFlowClassifications;
+    private final ReportVersionRepository reportVersions;
 
     JdbcAccountingSession(Connection connection) {
         context = new JdbcContext(connection);
@@ -46,6 +51,8 @@ final class JdbcAccountingSession implements AccountingSession {
         prepaidPlans = new JdbcPrepaidPlanRepository(context);
         prepaidAllocations = new JdbcPrepaidAllocationRepository(context);
         closings = new JdbcClosingRepository(context);
+        cashFlowClassifications = new JdbcCashFlowClassificationRepository(context);
+        reportVersions = new JdbcReportVersionRepository(context, new XmlReportDocumentCodec());
     }
 
     void abort() { context.abort(); }
@@ -64,4 +71,6 @@ final class JdbcAccountingSession implements AccountingSession {
     @Override public PrepaidPlanRepository prepaidPlans() { context.checkScope(); return prepaidPlans; }
     @Override public PrepaidAllocationRepository prepaidAllocations() { context.checkScope(); return prepaidAllocations; }
     @Override public ClosingRepository closings() { context.checkScope(); return closings; }
+    @Override public CashFlowClassificationRepository cashFlowClassifications() { context.checkScope(); return cashFlowClassifications; }
+    @Override public ReportVersionRepository reportVersions() { context.checkScope(); return reportVersions; }
 }

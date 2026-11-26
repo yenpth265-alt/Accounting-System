@@ -25,7 +25,8 @@ public final class SchemaMigrator {
             migration(1, "Catalogs and vouchers", "V001"),
             migration(2, "Journal and allocations", "V002"),
             migration(3, "Corrections and prepaid expenses", "V003"),
-            migration(4, "Period closing", "V004"));
+            migration(4, "Period closing", "V004"),
+            migration(5, "Cash flow classification and report versions", "V005"));
     private final SqlConnectionFactory connections;
 
     public SchemaMigrator(SqlConnectionFactory connections) {

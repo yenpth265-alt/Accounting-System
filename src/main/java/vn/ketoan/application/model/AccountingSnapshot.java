@@ -28,6 +28,11 @@ import vn.ketoan.domain.PrepaidPlanCancellation;
 import vn.ketoan.domain.User;
 import vn.ketoan.domain.VoucherDocument;
 import vn.ketoan.domain.VoucherStatus;
+import vn.ketoan.domain.report.CashFlowBook;
+import vn.ketoan.domain.report.CashFlowClassification;
+import vn.ketoan.domain.report.ReportArchive;
+import vn.ketoan.domain.report.ReportPublication;
+import vn.ketoan.domain.report.ReportVersion;
 
 /** Immutable cross-repository snapshot used to check integrity for every storage adapter. */
 public record AccountingSnapshot(List<Account> accounts, List<Partner> partners,
@@ -36,7 +41,9 @@ public record AccountingSnapshot(List<Account> accounts, List<Partner> partners,
                                List<DebtAllocation> allocations, List<AllocationCancellation> cancellations,
                                List<CorrectionRecord> corrections, List<PrepaidExpensePlan> prepaidPlans,
                                List<PrepaidPlanCancellation> prepaidCancellations, List<PrepaidAllocationRecord> prepaidAllocations,
-                               List<ClosingBatch> closingBatches, List<ClosingEvent> closingEvents) {
+                               List<ClosingBatch> closingBatches, List<ClosingEvent> closingEvents,
+                               List<CashFlowClassification> cashFlowClassifications, List<ReportVersion> reportVersions,
+                               List<ReportPublication> reportPublications) {
 
     public AccountingSnapshot {
         accounts = List.copyOf(accounts);
@@ -54,11 +61,14 @@ public record AccountingSnapshot(List<Account> accounts, List<Partner> partners,
         prepaidAllocations = List.copyOf(prepaidAllocations);
         closingBatches = List.copyOf(closingBatches);
         closingEvents = List.copyOf(closingEvents);
+        cashFlowClassifications = List.copyOf(cashFlowClassifications);
+        reportVersions = List.copyOf(reportVersions);
+        reportPublications = List.copyOf(reportPublications);
     }
 
     public static AccountingSnapshot empty() {
         return new AccountingSnapshot(List.of(), List.of(), List.of(), List.of(),
-                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
     }
 
     public static AccountingSnapshot capture(AccountingSession session) {
@@ -66,7 +76,8 @@ public record AccountingSnapshot(List<Account> accounts, List<Partner> partners,
                 session.moneyAccounts().findAll(), session.periods().findAll(), session.users().findAll(),
                 session.documents().findAll(), session.journal().findAll(), session.allocations().findAll(),
                 session.allocations().findCancellations(), session.corrections().findAll(), session.prepaidPlans().findAll(),
-                session.prepaidPlans().findCancellations(), session.prepaidAllocations().findAll(), session.closings().findAll(), session.closings().findEvents());
+                session.prepaidPlans().findCancellations(), session.prepaidAllocations().findAll(), session.closings().findAll(), session.closings().findEvents(),
+                session.cashFlowClassifications().findAll(), session.reportVersions().findAll(), session.reportVersions().findPublications());
     }
 
     public void validateIntegrity() {
@@ -130,5 +141,12 @@ public record AccountingSnapshot(List<Account> accounts, List<Partner> partners,
             throw new IllegalStateException("Closing history references an unknown user");
         }
         new ClosingBook(accounts, periods, documents, journal, closingBatches, closingEvents, corrections, prepaidPlans, prepaidAllocations);
+        if (cashFlowClassifications.stream().anyMatch(value -> !userIndex.containsKey(value.recordedBy()))
+                || reportVersions.stream().anyMatch(value -> !userIndex.containsKey(value.createdBy()))
+                || reportPublications.stream().anyMatch(value -> !userIndex.containsKey(value.publishedBy()))) {
+            throw new IllegalStateException("Cash flow or report history references an unknown user");
+        }
+        new CashFlowBook(accounts, journal, corrections, cashFlowClassifications);
+        new ReportArchive(reportVersions, reportPublications);
     }
 }

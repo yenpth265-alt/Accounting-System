@@ -1,6 +1,6 @@
 -- SCHEMA CHINH cua Accounting System: day la nguon dinh nghia SQL duy nhat.
 -- Tao database bang sql/00_create_database.sql, sau do chon database truoc khi chay file nay.
--- JDBC doc cac khoi BOOTSTRAP, V001, V002, V003, V004 tu chinh file nay. Maven dong goi file vao JAR.
+-- JDBC doc cac khoi BOOTSTRAP, V001, V002, V003, V004, V005 tu chinh file nay. Maven dong goi file vao JAR.
 -- Giu nguyen noi dung khoi da ap dung. Thay doi schema sau nay can migration moi.
 -- Chay bang MySQL client voi che do dung khi gap loi (khong dung --force).
 SET NAMES utf8mb4;
@@ -23,6 +23,7 @@ SET @acc_v001_checksum = '728f47e7fb96c36c067950034e4e3ec0a419d96e995b2f9ec4fd9b
 SET @acc_v002_checksum = '411d26653afa0db84156adae09145240753103ccc91785a3091b485935bf8c5d';
 SET @acc_v003_checksum = '258908c92725be54e4f8613e399a0c5b29d891a50e64a532379001e262ce148f';
 SET @acc_v004_checksum = '7bea31179c57752813d6f11e34c8494525bdb688d3d8f03f669d0185d6f186bc';
+SET @acc_v005_checksum = 'c4ed2139c1ed75cd32fb0357969f06859e38f3cd6b99363a4815435523a3ceaa';
 
 -- Chi khoi tao database trong hoac tiep tuc schema co lich su hop le.
 -- Neu co migration dang loi, dung lenh --db=resume-migration sau khi kiem tra.
@@ -30,12 +31,13 @@ SET @acc_schema_install_allowed =
     @acc_schema_install_lock = 1
     AND NOT EXISTS (
         SELECT 1 FROM acc_schema_history
-        WHERE success = FALSE OR version_no NOT IN (1, 2, 3, 4)
+        WHERE success = FALSE OR version_no NOT IN (1, 2, 3, 4, 5)
            OR checksum <> CASE version_no
                WHEN 1 THEN @acc_v001_checksum
                WHEN 2 THEN @acc_v002_checksum
                WHEN 3 THEN @acc_v003_checksum
                WHEN 4 THEN @acc_v004_checksum
+               WHEN 5 THEN @acc_v005_checksum
                ELSE ''
            END
     )
@@ -50,6 +52,10 @@ SET @acc_schema_install_allowed =
     AND (
         NOT EXISTS (SELECT 1 FROM acc_schema_history WHERE version_no = 4)
         OR EXISTS (SELECT 1 FROM acc_schema_history WHERE version_no = 3)
+    )
+    AND (
+        NOT EXISTS (SELECT 1 FROM acc_schema_history WHERE version_no = 5)
+        OR EXISTS (SELECT 1 FROM acc_schema_history WHERE version_no = 4)
     )
     AND (
         EXISTS (SELECT 1 FROM acc_schema_history)
@@ -414,6 +420,75 @@ CREATE TABLE IF NOT EXISTS acc_closing_events (
 UPDATE acc_schema_history
 SET success = TRUE, completed_at = DATE_FORMAT(UTC_TIMESTAMP(6), '%Y-%m-%dT%H:%i:%s.%fZ')
 WHERE version_no = 4 AND checksum = @acc_v004_checksum AND success = FALSE
+  AND @acc_schema_install_allowed = 1;
+
+INSERT INTO acc_schema_history (version_no, description, checksum, success, started_at)
+SELECT 5, 'Cash flow classification and report versions', @acc_v005_checksum, FALSE,
+       DATE_FORMAT(UTC_TIMESTAMP(6), '%Y-%m-%dT%H:%i:%s.%fZ')
+WHERE @acc_schema_install_allowed = 1
+  AND NOT EXISTS (SELECT 1 FROM acc_schema_history WHERE version_no = 5);
+
+-- BEGIN V005
+CREATE TABLE IF NOT EXISTS acc_cash_flow_classifications (
+    id VARCHAR(36) PRIMARY KEY,
+    entry_id VARCHAR(36) NOT NULL,
+    revision_no INT NOT NULL,
+    reason VARCHAR(255) NOT NULL,
+    internal_transfer DECIMAL(38,0) NOT NULL,
+    recorded_by BIGINT NOT NULL,
+    recorded_at VARCHAR(35) NOT NULL,
+    UNIQUE (entry_id,revision_no),
+    FOREIGN KEY (entry_id) REFERENCES acc_journal_entries(id),
+    FOREIGN KEY (recorded_by) REFERENCES acc_users(id),
+    CHECK (revision_no > 0),
+    CHECK (internal_transfer >= 0)
+);
+CREATE TABLE IF NOT EXISTS acc_cash_flow_splits (
+    classification_id VARCHAR(36) NOT NULL,
+    position_no INT NOT NULL,
+    activity VARCHAR(16) NOT NULL,
+    direction VARCHAR(8) NOT NULL,
+    amount DECIMAL(38,0) NOT NULL,
+    PRIMARY KEY (classification_id,position_no),
+    UNIQUE (classification_id,activity,direction),
+    FOREIGN KEY (classification_id) REFERENCES acc_cash_flow_classifications(id),
+    CHECK (position_no BETWEEN 0 AND 5),
+    CHECK (activity IN ('OPERATING','INVESTING','FINANCING')),
+    CHECK (direction IN ('INFLOW','OUTFLOW')),
+    CHECK (amount > 0)
+);
+CREATE TABLE IF NOT EXISTS acc_report_versions (
+    id VARCHAR(36) PRIMARY KEY,
+    period_from DATE NOT NULL,
+    period_to DATE NOT NULL,
+    version_no INT NOT NULL,
+    title VARCHAR(160) NOT NULL,
+    source_checksum VARCHAR(64) NOT NULL,
+    document_checksum VARCHAR(64) NOT NULL,
+    document_xml LONGTEXT NOT NULL,
+    periods_closed BOOLEAN NOT NULL,
+    cash_flow_complete BOOLEAN NOT NULL,
+    created_by BIGINT NOT NULL,
+    created_at VARCHAR(35) NOT NULL,
+    UNIQUE (period_from,period_to,version_no),
+    FOREIGN KEY (created_by) REFERENCES acc_users(id),
+    CHECK (period_from <= period_to),
+    CHECK (version_no > 0)
+);
+CREATE TABLE IF NOT EXISTS acc_report_publications (
+    version_id VARCHAR(36) PRIMARY KEY,
+    review_note VARCHAR(255) NOT NULL,
+    published_by BIGINT NOT NULL,
+    published_at VARCHAR(35) NOT NULL,
+    FOREIGN KEY (version_id) REFERENCES acc_report_versions(id),
+    FOREIGN KEY (published_by) REFERENCES acc_users(id),
+    CHECK (CHAR_LENGTH(TRIM(review_note)) > 0)
+);
+-- END V005
+
+UPDATE acc_schema_history
+SET success = TRUE, completed_at = DATE_FORMAT(UTC_TIMESTAMP(6), '%Y-%m-%dT%H:%i:%s.%fZ')
+WHERE version_no = 5 AND checksum = @acc_v005_checksum AND success = FALSE
   AND @acc_schema_install_allowed = 1;
 
 DROP TEMPORARY TABLE IF EXISTS acc_schema_install_guard;

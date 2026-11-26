@@ -15,6 +15,7 @@ import vn.ketoan.demo.SettlementDemo;
 import vn.ketoan.demo.VoucherDemo;
 import vn.ketoan.demo.WorkflowDemo;
 import vn.ketoan.demo.ReportDemo;
+import vn.ketoan.demo.ReportArchiveDemo;
 import vn.ketoan.domain.report.ReportPeriod;
 
 public final class Main {
@@ -32,11 +33,14 @@ public final class Main {
             System.out.println("Run with --demo=recognition to enter revenue and expenses independently of cash.");
             System.out.println("Run with --demo=settlement to collect/pay debts, allocate amounts and inspect open items.");
             System.out.println("Run with --demo=reports for in-memory journal, ledger and financial reports before/after closing.");
+            System.out.println("Run with --demo=report-versions for in-memory classified cash flows, notes and frozen report versions.");
             System.out.println("MySQL: configure database.local.properties or ACCOUNTING_DB_URL/USER/PASSWORD.");
             System.out.println("Run --db=migrate, --db=seed-demo, then --demo=jdbc for a persistent sample.");
             System.out.println("Run --demo=corrections or --demo=prepaid for persistent adjustments, reversals and prepaid expenses.");
             System.out.println("Run --demo=closing to prepare, review, post and lock the November 2026 demo period in MySQL.");
-            System.out.println("Run --reports=YYYY-MM to read monthly reports from MySQL without creating or posting vouchers (requires schema V004).");
+            System.out.println("Run --reports=YYYY-MM to read complete monthly reports from MySQL (requires schema V005).");
+            System.out.println("Run --report-save=YYYY-MM to save a draft version; --report-view=UUID to read it; --report-publish=UUID to record independent approval.");
+            System.out.println("Console report actions use demo actors: preparer 1, reviewer 2, reader 4.");
             System.out.println("Run --db=check to inspect stored data; --db=resume-migration resumes an inspected failed migration.");
             return;
         }
@@ -68,12 +72,24 @@ public final class Main {
             ReportDemo.run(System.out);
             return;
         }
-        if (args.length == 1 && args[0].startsWith("--reports=")) {
+        if (args.length == 1 && "--demo=report-versions".equals(args[0])) {
+            ReportArchiveDemo.run(System.out);
+            return;
+        }
+        if (args.length == 1 && (args[0].startsWith("--reports=") || args[0].startsWith("--report-save="))) {
             ReportPeriod period;
-            try { period = ReportPeriod.month(YearMonth.parse(args[0].substring("--reports=".length()))); }
-            catch (DateTimeParseException invalid) { throw new IllegalArgumentException("Use --reports=YYYY-MM", invalid); }
+            try { period = ReportPeriod.month(YearMonth.parse(args[0].substring(args[0].indexOf('=') + 1))); }
+            catch (DateTimeParseException invalid) { throw new IllegalArgumentException("Use --reports=YYYY-MM or --report-save=YYYY-MM", invalid); }
             DatabaseSettings settings = DatabaseSettings.load(Path.of("database.local.properties"), System.getenv());
-            DatabaseCommands.reports(period, System.out, new DatabaseConnection(settings));
+            if (args[0].startsWith("--report-save=")) { DatabaseCommands.saveReport(period, System.out, new DatabaseConnection(settings)); }
+            else { DatabaseCommands.reports(period, System.out, new DatabaseConnection(settings)); }
+            return;
+        }
+        if (args.length == 1 && (args[0].startsWith("--report-view=") || args[0].startsWith("--report-publish="))) {
+            java.util.UUID id = java.util.UUID.fromString(args[0].substring(args[0].indexOf('=') + 1));
+            DatabaseSettings settings = DatabaseSettings.load(Path.of("database.local.properties"), System.getenv());
+            if (args[0].startsWith("--report-view=")) { DatabaseCommands.viewReport(id, System.out, new DatabaseConnection(settings)); }
+            else { DatabaseCommands.publishReport(id, System.out, new DatabaseConnection(settings)); }
             return;
         }
         if (args.length == 1 && Set.of("--db=migrate", "--db=resume-migration", "--db=seed-demo", "--db=check", "--demo=jdbc",
@@ -84,7 +100,7 @@ public final class Main {
         }
         throw new IllegalArgumentException(
                 "Supported options: --help, --demo=master-data, --demo=vouchers, --demo=workflow, "
-                        + "--demo=posting, --demo=recognition, --demo=settlement, --demo=reports, --reports=YYYY-MM, --demo=jdbc, --demo=corrections, --demo=prepaid, --demo=closing, "
+                        + "--demo=posting, --demo=recognition, --demo=settlement, --demo=reports, --demo=report-versions, --reports=YYYY-MM, --report-save=YYYY-MM, --report-view=UUID, --report-publish=UUID, --demo=jdbc, --demo=corrections, --demo=prepaid, --demo=closing, "
                         + "--db=migrate, --db=resume-migration, --db=seed-demo, --db=check");
     }
 }

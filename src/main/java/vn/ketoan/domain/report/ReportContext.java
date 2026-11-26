@@ -28,13 +28,21 @@ public final class ReportContext {
     private final Map<String, MoneyAccount> funds;
     private final List<AccountingPeriod> periods;
     private final List<JournalRow> rows;
+    private final List<JournalEntry> journal;
+    private final ReportEvidence evidence;
 
     public ReportContext(Collection<Account> accounts, Collection<Partner> partners, Collection<MoneyAccount> funds,
                          Collection<AccountingPeriod> periods, Collection<JournalEntry> journal, Collection<ClosingBatch> closings) {
+        this(accounts, partners, funds, periods, journal, closings, ReportEvidence.empty());
+    }
+    public ReportContext(Collection<Account> accounts, Collection<Partner> partners, Collection<MoneyAccount> funds,
+                         Collection<AccountingPeriod> periods, Collection<JournalEntry> journal, Collection<ClosingBatch> closings, ReportEvidence evidence) {
         this.accounts = accounts.stream().collect(Collectors.toUnmodifiableMap(Account::getCode, Function.identity()));
         this.partners = partners.stream().collect(Collectors.toUnmodifiableMap(Partner::getCode, Function.identity()));
         this.funds = funds.stream().collect(Collectors.toUnmodifiableMap(MoneyAccount::getCode, Function.identity()));
         this.periods = List.copyOf(periods);
+        this.journal = List.copyOf(journal);
+        this.evidence = java.util.Objects.requireNonNull(evidence);
         Map<UUID, Integer> generated = new HashMap<>();
         for (ClosingBatch batch : closings) {
             for (int index = 0; index < batch.documentIds().size(); index++) {
@@ -51,6 +59,11 @@ public final class ReportContext {
                         .thenComparing(JournalRow::reference).thenComparing(row -> row.entryId().toString()).thenComparingInt(JournalRow::lineNumber)).toList();
     }
     public List<JournalRow> rows() { return rows; }
+    public List<JournalEntry> journal() { return journal; }
+    public ReportEvidence evidence() { return evidence; }
+    public List<Account> accounts() { return accounts.values().stream().sorted(Comparator.comparing(Account::getCode)).toList(); }
+    public List<Partner> partners() { return partners.values().stream().sorted(Comparator.comparing(Partner::getCode)).toList(); }
+    public List<MoneyAccount> funds() { return funds.values().stream().sorted(Comparator.comparing(MoneyAccount::getCode)).toList(); }
     public List<Account> postingAccounts() {
         return accounts.values().stream().filter(Account::isPostingAllowed).sorted(Comparator.comparing(Account::getCode)).toList();
     }

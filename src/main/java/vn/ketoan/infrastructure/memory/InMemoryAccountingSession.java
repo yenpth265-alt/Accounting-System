@@ -14,6 +14,8 @@ import vn.ketoan.application.port.AccountingSession;
 import vn.ketoan.application.port.DebtAllocationRepository;
 import vn.ketoan.application.port.CorrectionRepository;
 import vn.ketoan.application.port.ClosingRepository;
+import vn.ketoan.application.port.CashFlowClassificationRepository;
+import vn.ketoan.application.port.ReportVersionRepository;
 import vn.ketoan.application.port.JournalRepository;
 import vn.ketoan.application.port.MoneyAccountRepository;
 import vn.ketoan.application.port.PartnerRepository;
@@ -28,6 +30,9 @@ import vn.ketoan.domain.DebtAllocation;
 import vn.ketoan.domain.CorrectionRecord;
 import vn.ketoan.domain.ClosingBatch;
 import vn.ketoan.domain.ClosingEvent;
+import vn.ketoan.domain.report.CashFlowClassification;
+import vn.ketoan.domain.report.ReportVersion;
+import vn.ketoan.domain.report.ReportPublication;
 import vn.ketoan.domain.JournalEntry;
 import vn.ketoan.domain.MoneyAccount;
 import vn.ketoan.domain.Partner;
@@ -55,6 +60,8 @@ final class InMemoryAccountingSession implements AccountingSession {
     private final InMemoryPrepaidPlanRepository prepaidPlanData = new InMemoryPrepaidPlanRepository();
     private final InMemoryPrepaidAllocationRepository prepaidAllocationData = new InMemoryPrepaidAllocationRepository();
     private final InMemoryClosingRepository closingData = new InMemoryClosingRepository();
+    private final InMemoryCashFlowClassificationRepository cashFlowData = new InMemoryCashFlowClassificationRepository();
+    private final InMemoryReportVersionRepository reportVersionData = new InMemoryReportVersionRepository();
 
     InMemoryAccountingSession(AccountingSnapshot committed) {
         committed.accounts().forEach(accountData::insert);
@@ -72,6 +79,9 @@ final class InMemoryAccountingSession implements AccountingSession {
         committed.prepaidAllocations().forEach(prepaidAllocationData::append);
         committed.closingBatches().forEach(closingData::append);
         committed.closingEvents().forEach(closingData::appendEvent);
+        committed.cashFlowClassifications().forEach(cashFlowData::append);
+        committed.reportVersions().forEach(reportVersionData::append);
+        committed.reportPublications().forEach(reportVersionData::appendPublication);
     }
 
     private void checkScope() {
@@ -111,7 +121,7 @@ final class InMemoryAccountingSession implements AccountingSession {
                 periodData.findAll(), userData.findAll(), documentData.findAll(), journalData.findAll(),
                 allocationData.findAll(), allocationData.findCancellations(), correctionData.findAll(),
                 prepaidPlanData.findAll(), prepaidPlanData.findCancellations(), prepaidAllocationData.findAll(),
-                closingData.findAll(), closingData.findEvents());
+                closingData.findAll(), closingData.findEvents(), cashFlowData.findAll(), reportVersionData.findAll(), reportVersionData.findPublications());
     }
 
     private final AccountRepository accountView = new AccountRepository() {
@@ -353,4 +363,18 @@ final class InMemoryAccountingSession implements AccountingSession {
         @Override public void appendEvent(ClosingEvent event) { mutate(() -> closingData.appendEvent(event)); }
     };
     @Override public ClosingRepository closings() { checkScope(); return closingView; }
+    private final CashFlowClassificationRepository cashFlowView = new CashFlowClassificationRepository() {
+        @Override public Optional<CashFlowClassification> findById(UUID id) { return access(() -> cashFlowData.findById(id)); }
+        @Override public List<CashFlowClassification> findAll() { return access(cashFlowData::findAll); }
+        @Override public void append(CashFlowClassification value) { mutate(() -> cashFlowData.append(value)); }
+    };
+    private final ReportVersionRepository reportVersionView = new ReportVersionRepository() {
+        @Override public Optional<ReportVersion> findById(UUID id) { return access(() -> reportVersionData.findById(id)); }
+        @Override public List<ReportVersion> findAll() { return access(reportVersionData::findAll); }
+        @Override public void append(ReportVersion value) { mutate(() -> reportVersionData.append(value)); }
+        @Override public List<ReportPublication> findPublications() { return access(reportVersionData::findPublications); }
+        @Override public void appendPublication(ReportPublication value) { mutate(() -> reportVersionData.appendPublication(value)); }
+    };
+    @Override public CashFlowClassificationRepository cashFlowClassifications() { checkScope(); return cashFlowView; }
+    @Override public ReportVersionRepository reportVersions() { checkScope(); return reportVersionView; }
 }

@@ -26,4 +26,8 @@ public interface AccountingSession {
     PrepaidAllocationRepository prepaidAllocations();
 
     ClosingRepository closings();
+
+    CashFlowClassificationRepository cashFlowClassifications();
+
+    ReportVersionRepository reportVersions();
 }
